@@ -19,7 +19,7 @@ parser.add_argument('-prob',
 parser.add_argument('-bs',
                     type=int,
                     help='batchsize',
-                    default=4)
+                    default=64)
 
 parser.add_argument('-bs_val',
                     type=int,
@@ -60,7 +60,7 @@ parser.add_argument('-film',
                     type=int,
                     default=0)
 
-parser.add_argument('data_dir',
+parser.add_argument('-data_dir',
                     type=str,
                     help='Data directory')
 

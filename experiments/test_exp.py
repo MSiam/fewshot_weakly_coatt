@@ -18,6 +18,7 @@ if __name__ == "__main__":
         film=0,
         use_web=0,
         save_vis='VIS_DIR',
+        model_type='nwe_coatt'
     )
 
     parser = argparse.ArgumentParser()

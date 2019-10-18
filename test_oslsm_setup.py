@@ -36,7 +36,7 @@ def test(options):
 
     #load trained parameter
     checkpoint_dir = options.ckpt+'/fo=%d/'% options.fold
-    logger = open(checkpoint_dir+'final_test_miou.txt', 'r')
+    logger = open(checkpoint_dir+'final_test_miou.txt', 'w')
     model=nn.DataParallel(model,[0])
     model.load_state_dict(torch.load(checkpoint_dir+'model/best.pth'))
 
