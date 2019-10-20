@@ -18,15 +18,15 @@ import numpy as np
 def meta_train(options):
     data_dir = options.data_dir
 
-    torch.manual_seed(1337)
-    torch.cuda.manual_seed(1337)
-    np.random.seed(1337)
-    random.seed(1337)
+    torch.manual_seed(options.seed)
+    torch.cuda.manual_seed(options.seed)
+    np.random.seed(options.seed)
+    random.seed(options.seed)
 
-    torch.manual_seed(1337)
-    torch.cuda.manual_seed(1337)
-    np.random.seed(1337)
-    random.seed(1337)
+    torch.manual_seed(options.seed)
+    torch.cuda.manual_seed(options.seed)
+    np.random.seed(options.seed)
+    random.seed(options.seed)
 
     #set gpus
     gpu_list = [int(x) for x in options.gpu.split(',')]
@@ -64,13 +64,13 @@ def meta_train(options):
     # loading data
     # trainset
     dataset = Dataset_train(data_dir=data_dir, fold=options.fold, input_size=input_size, normalize_mean=IMG_MEAN,
-                      normalize_std=IMG_STD,prob=options.prob)
+                      normalize_std=IMG_STD, prob=options.prob, seed=options.seed)
     trainloader = data.DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=4)
 
     # valset
     # this only a quick val dataset where all images are 321*321.
     valset = Dataset_val(data_dir=data_dir, fold=options.fold, input_size=input_size, normalize_mean=IMG_MEAN,
-                     normalize_std=IMG_STD, split=options.split, seed=1337)
+                     normalize_std=IMG_STD, split=options.split, seed=options.seed)
     valloader = data.DataLoader(valset, batch_size=options.bs_val, shuffle=False, num_workers=4,
                                 drop_last=False)
 

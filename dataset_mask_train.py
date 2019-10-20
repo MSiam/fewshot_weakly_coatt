@@ -17,9 +17,12 @@ class Dataset(object):
 
 
     def __init__(self, data_dir, fold, input_size=[321, 321] , normalize_mean=[0, 0, 0],
-                 normalize_std=[1, 1, 1],prob=0.7):
+                 normalize_std=[1, 1, 1], prob=0.7, seed=None):
         # -------------------load data list,[class,video_name]-------------------
         self.data_dir = data_dir
+        self.rand = random.Random()
+        if seed is not None:
+            self.rand.seed(seed)
         self.new_exist_class_list = self.get_new_exist_class_dict(fold=fold)
         self.initiaize_transformation(normalize_mean, normalize_std, input_size)
         self.binary_pair_list = self.get_binary_pair_list()
@@ -66,7 +69,6 @@ class Dataset(object):
         return out_list
 
     def __getitem__(self, index):
-
         # give an query index,sample a target class first
         query_name = self.new_exist_class_list[index][0]
         sample_class = self.new_exist_class_list[index][1]  # random sample a class in this img
@@ -75,7 +77,7 @@ class Dataset(object):
 
         support_img_list = self.binary_pair_list[sample_class]  # all img that contain the sample_class
         while True:  # random sample a support data
-            support_name = support_img_list[random.randint(0, len(support_img_list) - 1)]
+            support_name = support_img_list[self.rand.randint(0, len(support_img_list) - 1)]
             if support_name != query_name:
                 break
 
@@ -83,10 +85,10 @@ class Dataset(object):
 
         input_size = self.input_size[0]
         # random scale and crop for support
-        scaled_size = int(random.uniform(1,1.5)*input_size)
+        scaled_size = int(self.rand.uniform(1,1.5)*input_size)
         scale_transform_mask = torchvision.transforms.Resize([scaled_size, scaled_size], interpolation=Image.NEAREST)
         scale_transform_rgb = torchvision.transforms.Resize([scaled_size, scaled_size], interpolation=Image.BILINEAR)
-        flip_flag = random.random()
+        flip_flag = self.rand.random()
         support_rgb = self.normalize(
             self.ToTensor(
                 scale_transform_rgb(
@@ -101,8 +103,8 @@ class Dataset(object):
                               os.path.join(self.data_dir, 'Binary_map_aug', 'train', str(sample_class),
                                            support_name + '.png')))))
 
-        margin_h = random.randint(0, scaled_size - input_size)
-        margin_w = random.randint(0, scaled_size - input_size)
+        margin_h = self.rand.randint(0, scaled_size - input_size)
+        margin_w = self.rand.randint(0, scaled_size - input_size)
         support_rgb = support_rgb[:, margin_h:margin_h + input_size, margin_w:margin_w + input_size]
         support_mask = support_mask[:, margin_h:margin_h + input_size, margin_w:margin_w + input_size]
 
@@ -130,8 +132,8 @@ class Dataset(object):
                               os.path.join(self.data_dir, 'Binary_map_aug', 'train', str(sample_class),
                                            query_name + '.png')))))
 
-        margin_h = random.randint(0, scaled_size - input_size)
-        margin_w = random.randint(0, scaled_size - input_size)
+        margin_h = self.rand.randint(0, scaled_size - input_size)
+        margin_w = self.rand.randint(0, scaled_size - input_size)
 
         query_rgb = query_rgb[:, margin_h:margin_h + input_size, margin_w:margin_w + input_size]
         query_mask = query_mask[:, margin_h:margin_h + input_size, margin_w:margin_w + input_size]
@@ -143,7 +145,7 @@ class Dataset(object):
             history_mask=torch.zeros(2,41,41).fill_(0.0)
 
         else:
-            if random.random()>self.prob:
+            if self.rand.random()>self.prob:
                 history_mask=self.history_mask_list[index]
             else:
                 history_mask = torch.zeros(2, 41, 41).fill_(0.0)

@@ -74,6 +74,11 @@ parser.add_argument('-use_web',
                     help='flag to use web data or pascal5i for support',
                     default=0)
 
+parser.add_argument('-seed',
+                    type=int,
+                    default=1337)
+
+
 options = parser.parse_args()
 meta_train(options)
 test(options)
