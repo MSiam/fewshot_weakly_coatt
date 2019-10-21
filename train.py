@@ -76,8 +76,9 @@ def meta_train(options):
 
     save_pred_every =len(trainloader)
 
-    optimizer = optim.SGD([{'params': get_10x_lr_params(model), 'lr': 10 * learning_rate}],
-                              lr=learning_rate, momentum=momentum, weight_decay=weight_decay)
+    optimizer = optim.SGD([{'params': get_10x_lr_params(model, options.model_type, options.film),
+                        'lr': 10 * learning_rate}],
+                        lr=learning_rate, momentum=momentum, weight_decay=weight_decay)
 
     loss_list = []#track training loss
     iou_list = []#track validaiton iou

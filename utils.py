@@ -48,13 +48,38 @@ def turn_off(model):
 
 
 
-def get_10x_lr_params(model):
+def get_10x_lr_params(model, model_type, filmed):
     """
     get layers for optimization
     """
 
     b = []
     b.append(model.module.layer5.parameters())
+    if model_type == 'coatt':
+        b.append(model.module.linear_e.parameters())
+        b.append(model.module.gate.parameters())
+
+    elif model_type == 'nwe_coatt':
+        b.append(model.module.linear_e.parameters())
+        b.append(model.module.gate.parameters())
+        b.append(model.module.linear_word_embedding.parameters())
+        if filmed:
+            b.append(model.module.layer3.parameters())
+            b.append(model.module.film_gen.parameters())
+        else:
+            b.append(model.module.reduction.parameters())
+
+    elif model_type == 'nwe':
+        b.append(model.module.linear_word_embedding.parameters())
+        b.append(model.module.reduction.parameters())
+
+    elif model_type == 'iter_nwe_coatt':
+        b.append(model.module.linear_e.parameters())
+        b.append(model.module.gate.parameters())
+        b.append(model.module.linear_word_embedding.parameters())
+        b.append(model.module.reduction.parameters())
+        b.append(model.module.reduction_cat.parameters())
+
     b.append(model.module.layer55.parameters())
     b.append(model.module.layer6_0.parameters())
     b.append(model.module.layer6_1.parameters())
