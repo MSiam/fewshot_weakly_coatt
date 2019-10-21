@@ -88,7 +88,7 @@ def test(options):
                 sub_index = index[j]
                 inferset.history_mask_list[sub_index] = pred_softmax[j]
 
-                pred = nn.functional.interpolate(pred, size=input_size, mode='bilinear',
+            pred = nn.functional.interpolate(pred, size=input_size, mode='bilinear',
                                                  align_corners=True)  #upsample  # upsample
 
             _, pred_label = torch.max(pred, 1)
