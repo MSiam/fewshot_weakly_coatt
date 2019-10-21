@@ -19,7 +19,7 @@ parser.add_argument('-prob',
 parser.add_argument('-bs',
                     type=int,
                     help='batchsize',
-                    default=64)
+                    default=4)
 
 parser.add_argument('-bs_val',
                     type=int,
