@@ -5,6 +5,8 @@ import time
 import argparse
 import git
 
+from common.gen_experiments import gen_experiments_dir, find_variables
+
 os.environ['LANG'] = 'en_CA.UTF-8'
 
 if __name__ == "__main__":
