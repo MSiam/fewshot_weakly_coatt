@@ -24,14 +24,15 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        '--aidata_home', type=str, default="/home/boris/", help='The path of your home in /mnt/.')
+        '--aidata_home', type=str, default="/scratch/boris/projects/", help='The path of your home in /mnt/.')
 
     aidata_home = parser.parse_known_args()[0].aidata_home
     exp_tag = '_'.join(find_variables(params))  # extract variable names
-    exp_dir = os.path.join(aidata_home, "experiments_fewshot_webly",
+    project_path = os.path.join(aidata_home, "fewshotwebly_coatt")
+    exp_dir = os.path.join(project_path, "experiments",
                            "%s_%s_%s" % (time.strftime("%y%m%d_%H%M%S"), exp_tag, exp_description))
 
-    project_path = os.path.join(aidata_home, "fewshotwebly_coatt")
+    
 
     # This is for the reproducibility purposes
     repo_path = '/mnt' + project_path
@@ -44,7 +45,6 @@ if __name__ == "__main__":
         "-e", "PYTHONPATH=%s" % repo_path,
         "-e", "DATA_PATH=/mnt/datasets/public/",
         "-v", "/mnt/datasets/public/:/mnt/datasets/public/",
-        "-v", "/mnt/home/boris/:/mnt/home/boris/",
         "-v", "/mnt/scratch/:/mnt/scratch/",
         "--cpu=2",
         "--gpu=1",
