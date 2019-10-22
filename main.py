@@ -80,6 +80,11 @@ parser.add_argument('-seed',
                     type=int,
                     default=1337)
 
+parser.add_argument('--exp_dir',
+                    type=str,
+                    help='directory where all the experiment info is stored',
+                    default='')
+
 
 def main(argv=None):
   options = parser.parse_args()
