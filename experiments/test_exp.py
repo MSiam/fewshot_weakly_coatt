@@ -40,7 +40,7 @@ if __name__ == "__main__":
     params['commit'] = repo.head.object.hexsha
 
     borgy_args = [
-        "--image=images.borgy.elementai.lan/tensorflow/tensorflow:1.4.1-devel-gpu-py3",
+        "--image=images.borgy.elementai.net/fewshot_webly:boris",
         "-w", "/",
         "-e", "PYTHONPATH=%s" % repo_path,
         "-e", "DATA_PATH=/mnt/datasets/public/",
