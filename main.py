@@ -1,4 +1,6 @@
+#!/usr/bin/env python3
 
+"""Training and evaluation entry point."""
 import argparse
 from train import meta_train
 from test_oslsm_setup import test
@@ -79,7 +81,11 @@ parser.add_argument('-seed',
                     default=1337)
 
 
-options = parser.parse_args()
-meta_train(options)
-test(options)
+def main(argv=None):
+  options = parser.parse_args()
+  meta_train(options)
+  test(options)
+  
 
+if __name__ == '__main__':
+  main()
