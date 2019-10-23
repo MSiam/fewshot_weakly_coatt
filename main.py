@@ -4,6 +4,7 @@
 import argparse
 from train import meta_train
 from test_oslsm_setup import test
+from common.gen_experiments import load_and_save_params, Namespace
 
 parser = argparse.ArgumentParser()
 
@@ -88,6 +89,10 @@ parser.add_argument('--exp_dir',
 
 def main(argv=None):
   options = parser.parse_args()
+
+  options = Namespace(load_and_save_params(vars(options), options.exp_dir))
+  print(options)
+
   meta_train(options)
   test(options)
   

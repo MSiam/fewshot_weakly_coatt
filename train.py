@@ -65,13 +65,13 @@ def meta_train(options):
     # trainset
     dataset = Dataset_train(data_dir=data_dir, fold=options.fold, input_size=input_size, normalize_mean=IMG_MEAN,
                       normalize_std=IMG_STD, prob=options.prob, seed=options.seed)
-    trainloader = data.DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=4)
+    trainloader = data.DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=0)
 
     # valset
     # this only a quick val dataset where all images are 321*321.
     valset = Dataset_val(data_dir=data_dir, fold=options.fold, input_size=input_size, normalize_mean=IMG_MEAN,
                      normalize_std=IMG_STD, split=options.split, seed=options.seed)
-    valloader = data.DataLoader(valset, batch_size=options.bs_val, shuffle=False, num_workers=4,
+    valloader = data.DataLoader(valset, batch_size=options.bs_val, shuffle=False, num_workers=0,
                                 drop_last=False)
 
     save_pred_every =len(trainloader)

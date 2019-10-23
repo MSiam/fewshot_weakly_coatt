@@ -16,7 +16,7 @@ if __name__ == "__main__":
         fold=0,
         ckpt='testing',
         split='val',
-        data_dir='DATA_DIR',
+        data_dir='/mnt/datasets/public/research/pascal/VOCdevkit/VOC2012/',
         film=0,
         use_web=0,
         save_vis='VIS_DIR',
