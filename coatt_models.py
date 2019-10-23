@@ -3,6 +3,8 @@ import torch
 import numpy as np
 import torch.nn.functional as F
 from base_models import ResNet, FilMedBottleneck, FiLM
+import os
+
 
 class CoResNet(ResNet):
     def __init__(self, block, layers, num_classes):
@@ -88,11 +90,11 @@ class CoResNet(ResNet):
         return out
 
 class WordEmbedCoResNet(CoResNet):
-    def __init__(self, block, layers, num_classes, film_gen=None):
+    def __init__(self, block, layers, num_classes, film_gen=None, data_dir='./datasets/'):
         super(WordEmbedCoResNet, self).__init__(block, layers, num_classes)
         self.linear_word_embedding = nn.Linear(300, 256, bias=False)
         self.film_gen = film_gen
-        self.word2vec = np.load('embeddings.npy', allow_pickle=True).item()
+        self.word2vec = np.load(os.path.join(data_dir, 'embeddings.npy'), allow_pickle=True).item()
         self.classes = ['plane', 'bicycle', 'bird', 'boat',
                         'bottle', 'bus', 'car', 'cat', 'chair',
                         'cow', 'table', 'dog', 'horse',
@@ -257,10 +259,10 @@ class WordEmbedCoResNet(CoResNet):
         return out
 
 class WordEmbedResNet(CoResNet):
-    def __init__(self, block, layers, num_classes):
+    def __init__(self, block, layers, num_classes, data_dir='./datasets/'):
         super(WordEmbedResNet, self).__init__(block, layers, num_classes)
         self.linear_word_embedding = nn.Linear(300, 256, bias=False)
-        self.word2vec = np.load('embeddings.npy', allow_pickle=True).item()
+        self.word2vec = np.load(os.path.join(data_dir, 'embeddings.npy'), allow_pickle=True).item()
         self.classes = ['plane', 'bicycle', 'bird', 'boat',
                         'bottle', 'bus', 'car', 'cat', 'chair',
                         'cow', 'table', 'dog', 'horse',
