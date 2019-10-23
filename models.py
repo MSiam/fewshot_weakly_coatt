@@ -3,7 +3,7 @@ from improved_models import IterativeWordEmbedCoResNet
 from base_models import ResNet, FilMGen, Bottleneck
 
 
-def Res_Deeplab(num_classes=2, model_type='nwe_coatt', filmed=False):
+def Res_Deeplab(data_dir='./datasets/', num_classes=2, model_type='nwe_coatt', filmed=False):
     if filmed and 'nwe' in model_type:
         bottleneck_module = Bottleneck#FilMedBottleneck
         film_gen = FilMGen()
@@ -16,13 +16,13 @@ def Res_Deeplab(num_classes=2, model_type='nwe_coatt', filmed=False):
                                            num_classes)
     elif model_type == 'nwe_coatt':
         model = WordEmbedCoResNet(bottleneck_module, [3, 4, 6, 3],
-                                  num_classes, film_gen)
+                                  num_classes, film_gen, data_dir=data_dir)
     elif model_type == 'coatt':
         model = CoResNet(bottleneck_module, [3, 4, 6, 3],
                          num_classes)
     elif model_type == 'nwe':
         model = WordEmbedResNet(bottleneck_module, [3, 4, 6, 3],
-                                num_classes)
+                                num_classes, data_dir=data_dir)
     else:
         model = ResNet(bottleneck_module,[3, 4, 6, 3],
                        num_classes)

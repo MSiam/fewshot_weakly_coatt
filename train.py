@@ -49,7 +49,7 @@ def meta_train(options):
     cudnn.enabled = True
 
     # Create network.
-    model = Res_Deeplab(num_classes=num_class, model_type=options.model_type, filmed=options.film)
+    model = Res_Deeplab(data_dir=data_dir, num_classes=num_class, model_type=options.model_type, filmed=options.film)
 
     # load resnet-50 preatrained parameter
     model = load_resnet50_param(model, stop_layer='layer4')
