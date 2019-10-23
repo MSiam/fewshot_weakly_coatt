@@ -13,7 +13,7 @@ def Res_Deeplab(data_dir='./datasets/', num_classes=2, model_type='nwe_coatt', f
 
     if model_type == 'iter_nwe_coatt':
         model = IterativeWordEmbedCoResNet(bottleneck_module, [3, 4, 6, 3],
-                                           num_classes)
+                                           num_classes, data_dir=data_dir)
     elif model_type == 'nwe_coatt':
         model = WordEmbedCoResNet(bottleneck_module, [3, 4, 6, 3],
                                   num_classes, film_gen, data_dir=data_dir)
