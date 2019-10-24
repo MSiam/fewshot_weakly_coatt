@@ -69,10 +69,10 @@ def meta_train(options):
 
     # valset
     # this only a quick val dataset where all images are 321*321.
-    valset = Dataset_val(data_dir=data_dir, fold=options.fold, input_size=input_size, normalize_mean=IMG_MEAN,
-                     normalize_std=IMG_STD, split=options.split, seed=options.seed)
-    valloader = data.DataLoader(valset, batch_size=options.bs_val, shuffle=False, num_workers=4,
-                                drop_last=False)
+#    valset = Dataset_val(data_dir=data_dir, fold=options.fold, input_size=input_size, normalize_mean=IMG_MEAN,
+#                     normalize_std=IMG_STD, split=options.split, seed=options.seed)
+#    valloader = data.DataLoader(valset, batch_size=options.bs_val, shuffle=False, num_workers=4,
+#                                drop_last=False)
 
     save_pred_every =len(trainloader)
 
@@ -141,9 +141,15 @@ def meta_train(options):
             print ('----Evaluation----')
             model = model.eval()
 
-            valset.history_mask_list=[None] * 1000
+#            valset.history_mask_list=[None] * 1000
             best_iou = 0
             for eva_iter in range(options.iter_time):
+                valset = Dataset_val(data_dir=data_dir, fold=options.fold, input_size=input_size, normalize_mean=IMG_MEAN,
+                                     normalize_std=IMG_STD, split=options.split, seed=initial_seed+eva_iter)
+                valset.history_mask_list=[None] * 1000
+                valloader = data.DataLoader(valset, batch_size=options.bs_val, shuffle=False, num_workers=4,
+                                            drop_last=False)
+
                 all_inter, all_union, all_predict = [0] * 15, [0] * 15, [0] * 15
                 for i_iter, batch in enumerate(valloader):
 
