@@ -5,6 +5,8 @@ import time
 import argparse
 import git
 
+from common.gen_experiments import gen_experiments_dir, find_variables
+
 os.environ['LANG'] = 'en_CA.UTF-8'
 
 if __name__ == "__main__":
@@ -14,7 +16,7 @@ if __name__ == "__main__":
         fold=0,
         ckpt='testing',
         split='val',
-        data_dir='DATA_DIR',
+        data_dir='/mnt/datasets/public/research/pascal/VOCdevkit/VOC2012/',
         film=0,
         use_web=0,
         save_vis='VIS_DIR',
@@ -24,14 +26,15 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        '--aidata_home', type=str, default="/home/boris/", help='The path of your home in /mnt/.')
+        '--aidata_home', type=str, default="/scratch/boris/projects/", help='The path of your home in /mnt/.')
 
     aidata_home = parser.parse_known_args()[0].aidata_home
     exp_tag = '_'.join(find_variables(params))  # extract variable names
-    exp_dir = os.path.join(aidata_home, "experiments_fewshot_webly",
+    project_path = os.path.join(aidata_home, "fewshotwebly_coatt")
+    exp_dir = os.path.join(project_path, "experiments",
                            "%s_%s_%s" % (time.strftime("%y%m%d_%H%M%S"), exp_tag, exp_description))
 
-    project_path = os.path.join(aidata_home, "fewshotwebly_coatt")
+    
 
     # This is for the reproducibility purposes
     repo_path = '/mnt' + project_path
@@ -39,12 +42,11 @@ if __name__ == "__main__":
     params['commit'] = repo.head.object.hexsha
 
     borgy_args = [
-        "--image=images.borgy.elementai.lan/tensorflow/tensorflow:1.4.1-devel-gpu-py3",
+        "--image=images.borgy.elementai.net/fewshot_webly:boris",
         "-w", "/",
         "-e", "PYTHONPATH=%s" % repo_path,
         "-e", "DATA_PATH=/mnt/datasets/public/",
         "-v", "/mnt/datasets/public/:/mnt/datasets/public/",
-        "-v", "/mnt/home/boris/:/mnt/home/boris/",
         "-v", "/mnt/scratch/:/mnt/scratch/",
         "--cpu=2",
         "--gpu=1",

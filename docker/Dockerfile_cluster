@@ -2,7 +2,7 @@ FROM nvidia/cuda:9.0-cudnn7-devel-ubuntu16.04
 
 MAINTAINER Boris Oreshkin <boris@elementai.com>
 
-RUN apt-get update --fix-missing && apt-get install -y wget
+RUN apt-get update --fix-missing && apt-get install -y wget unzip libsm6 libxext6 libxrender-dev
 
 RUN echo 'export PATH=/opt/conda/bin:$PATH' > /etc/profile.d/conda.sh && \
     wget --no-check-certificate --quiet https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh && \

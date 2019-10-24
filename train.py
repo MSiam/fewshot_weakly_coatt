@@ -49,7 +49,7 @@ def meta_train(options):
     cudnn.enabled = True
 
     # Create network.
-    model = Res_Deeplab(num_classes=num_class, model_type=options.model_type, filmed=options.film)
+    model = Res_Deeplab(data_dir=data_dir, num_classes=num_class, model_type=options.model_type, filmed=options.film)
 
     # load resnet-50 preatrained parameter
     model = load_resnet50_param(model, stop_layer='layer4')
@@ -65,7 +65,7 @@ def meta_train(options):
     # trainset
     dataset = Dataset_train(data_dir=data_dir, fold=options.fold, input_size=input_size, normalize_mean=IMG_MEAN,
                       normalize_std=IMG_STD, prob=options.prob, seed=options.seed)
-    trainloader = data.DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=4)
+    trainloader = data.DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=0)
 
     # valset
     # this only a quick val dataset where all images are 321*321.

@@ -1,4 +1,4 @@
-FROM nvidia/cuda:10.1-cudnn7.6.3-devel-ubuntu18.04
+FROM nvidia/cuda:9.0-cudnn7-devel-ubuntu16.04 
 
 MAINTAINER Boris Oreshkin <boris@elementai.com>
 
@@ -38,8 +38,8 @@ RUN conda install -y pymongo pandas jupyter pillow requests matplotlib tqdm \
     h5py pytorch=0.4.1 opencv
 
 RUN pip install pyyaml celery tensorflow-gpu==1.8.0 tensorboard==1.8.0 statsmodels gitpython \ 
-    scikit-image opencv-python scikit-learn googledrivedownloader scipy torchvision==0.4.0 \
-    numpy tensorboardX torch==1.3.0
+    scikit-image opencv-python scikit-learn googledrivedownloader scipy torchvision==0.4.1 \
+    numpy==1.17.3 tensorboardX torch==1.3.0
 
 ENTRYPOINT [ "/usr/bin/tini", "--" ]
 
