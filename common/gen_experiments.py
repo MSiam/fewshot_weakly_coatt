@@ -47,7 +47,7 @@ def make_experiment_name(experiment):
             args.append("%s=%.4g" % (name, value))
         else:
             args.append("%s=%s" % (name, value))
-    return ';'.join(args)
+    return ','.join(args)
 
 
 def gen_experiments_dir(param_dict, root_dir, exp_description, cmd=None, blocking=False, borgy_args=None):
