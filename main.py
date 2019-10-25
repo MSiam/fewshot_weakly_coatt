@@ -86,6 +86,11 @@ parser.add_argument('--exp_dir',
                     help='directory where all the experiment info is stored',
                     default='')
 
+parser.add_argument('-resume',
+                    type=int,
+                    help='epoch to resume from if 0 doesnt resume'
+                    default=0)
+
 
 def main(argv=None):
   options = parser.parse_args()
@@ -95,7 +100,7 @@ def main(argv=None):
 
   meta_train(options)
   test(options)
-  
+
 
 if __name__ == '__main__':
   main()

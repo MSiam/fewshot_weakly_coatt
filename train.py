@@ -59,7 +59,11 @@ def meta_train(options):
     turn_off(model)
 
     checkpoint_dir = options.ckpt+'/fo=%d/'% options.fold
-    check_dir(checkpoint_dir)
+    if options.resume:
+        if os.path.exists(checkpoint_dir+'model/epoch_%04d.pth'%options.resume):
+            model.load_state_dict(torch.load(checkpoint_dir+'model/epoch_%04d.pth'%options.resume))
+    else:
+        check_dir(checkpoint_dir)
 
     # loading data
     # trainset
@@ -198,10 +202,12 @@ def meta_train(options):
             iou_list.append(best_iou)
             plot_iou(checkpoint_dir, iou_list)
             np.savetxt(os.path.join(checkpoint_dir, 'iou_history.txt'), np.array(iou_list))
+            torch.save(model.cpu().state_dict(), osp.join(checkpoint_dir, 'model', 'epoch_%04d'%epoch, '.pth'))
+
             if best_iou>highest_iou:
                 highest_iou = best_iou
                 model = model.eval()
-                torch.save(model.cpu().state_dict(), osp.join(checkpoint_dir, 'model', 'best' '.pth'))
+                torch.save(model.cpu().state_dict(), osp.join(checkpoint_dir, 'model', 'best', '.pth'))
                 model = model.train()
                 best_epoch = epoch
                 print('A better model is saved')
