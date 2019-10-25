@@ -91,6 +91,16 @@ parser.add_argument('-resume',
                     help='epoch to resume from if 0 doesnt resume',
                     default=0)
 
+parser.add_argument('-gamma_steplr',
+                    type=float,
+                    help='gamma used in step LR scheduler',
+                    default=1.0)
+
+parser.add_argument('-step_steplr',
+                    type=int,
+                    help='step in step LR scheduler',
+                    default=50)
+
 
 def main(argv=None):
   options = parser.parse_args()

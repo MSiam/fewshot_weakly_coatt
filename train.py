@@ -15,6 +15,7 @@ from models import Res_Deeplab
 import torch.nn as nn
 import numpy as np
 import sys
+from torch.optim.lr_scheduler import StepLR
 
 def meta_train(options):
     data_dir = options.data_dir
@@ -87,6 +88,7 @@ def meta_train(options):
     optimizer = optim.SGD([{'params': get_10x_lr_params(model, options.model_type, options.film),
                         'lr': 10 * learning_rate}],
                         lr=learning_rate, momentum=momentum, weight_decay=weight_decay)
+    scheduler = StepLR(optimizer, step_size=options.step_steplr, gamma=options.gamma_steplr)
 
     loss_list = []#track training loss
     iou_list = []#track validaiton iou
@@ -98,7 +100,8 @@ def meta_train(options):
     best_epoch=0
     for epoch in range(0,num_epoch):
         print('Running epoch ', epoch, ' from ', num_epoch)
-
+        print('Epoch:', epoch,'LR:', scheduler.get_lr())
+        scheduler.step()
         begin_time = time.time()
         tqdm_gen = tqdm.tqdm(trainloader)
 
