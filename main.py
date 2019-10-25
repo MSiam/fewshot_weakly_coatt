@@ -88,7 +88,7 @@ parser.add_argument('--exp_dir',
 
 parser.add_argument('-resume',
                     type=int,
-                    help='epoch to resume from if 0 doesnt resume'
+                    help='epoch to resume from if 0 doesnt resume',
                     default=0)
 
 

@@ -14,6 +14,7 @@ import torch
 from models import Res_Deeplab
 import torch.nn as nn
 import numpy as np
+import sys
 
 def meta_train(options):
     data_dir = options.data_dir
@@ -62,6 +63,9 @@ def meta_train(options):
     if options.resume:
         if os.path.exists(checkpoint_dir+'model/epoch_%04d.pth'%options.resume):
             model.load_state_dict(torch.load(checkpoint_dir+'model/epoch_%04d.pth'%options.resume))
+        else:
+            print('Checkpoint does not exist')
+            sys.exit(0)
     else:
         check_dir(checkpoint_dir)
 
@@ -147,6 +151,7 @@ def meta_train(options):
 
 #            valset.history_mask_list=[None] * 1000
             best_iou = 0
+            initial_seed = options.seed #+ epoch
             for eva_iter in range(options.iter_time):
                 valset = Dataset_val(data_dir=data_dir, fold=options.fold, input_size=input_size, normalize_mean=IMG_MEAN,
                                      normalize_std=IMG_STD, split=options.split, seed=initial_seed+eva_iter)
@@ -202,12 +207,12 @@ def meta_train(options):
             iou_list.append(best_iou)
             plot_iou(checkpoint_dir, iou_list)
             np.savetxt(os.path.join(checkpoint_dir, 'iou_history.txt'), np.array(iou_list))
-            torch.save(model.cpu().state_dict(), osp.join(checkpoint_dir, 'model', 'epoch_%04d'%epoch, '.pth'))
+            torch.save(model.cpu().state_dict(), osp.join(checkpoint_dir, 'model', 'epoch_%04d'%epoch+'.pth'))
 
             if best_iou>highest_iou:
                 highest_iou = best_iou
                 model = model.eval()
-                torch.save(model.cpu().state_dict(), osp.join(checkpoint_dir, 'model', 'best', '.pth'))
+                torch.save(model.cpu().state_dict(), osp.join(checkpoint_dir, 'model', 'best.pth'))
                 model = model.train()
                 best_epoch = epoch
                 print('A better model is saved')
