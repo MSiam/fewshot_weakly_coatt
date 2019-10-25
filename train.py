@@ -101,7 +101,6 @@ def meta_train(options):
     for epoch in range(0,num_epoch):
         print('Running epoch ', epoch, ' from ', num_epoch)
         print('Epoch:', epoch,'LR:', scheduler.get_lr())
-        scheduler.step()
         begin_time = time.time()
         tqdm_gen = tqdm.tqdm(trainloader)
 
@@ -146,6 +145,7 @@ def meta_train(options):
                 plot_loss(checkpoint_dir, loss_list, save_pred_every)
                 np.savetxt(os.path.join(checkpoint_dir, 'loss_history.txt'), np.array(loss_list))
                 tempory_loss = 0
+        scheduler.step()
 
         # ======================evaluate now==================
         with torch.no_grad():
