@@ -32,7 +32,7 @@ def test(options):
 
     cudnn.enabled = True
     # Create network.
-    model = Res_Deeplab(num_classes=num_class, model_type=options.model_type, filmed=options.film)
+    model = Res_Deeplab(data_dir=data_dir, num_classes=num_class, model_type=options.model_type, filmed=options.film)
 
     #load trained parameter
     checkpoint_dir = options.ckpt+'/fo=%d/'% options.fold
