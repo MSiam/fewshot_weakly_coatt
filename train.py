@@ -16,6 +16,7 @@ import torch.nn as nn
 import numpy as np
 import sys
 from torch.optim.lr_scheduler import StepLR
+from common.torch_utils import SnapshotManager
 
 def meta_train(options):
     data_dir = options.data_dir
@@ -89,6 +90,9 @@ def meta_train(options):
                         'lr': 10 * learning_rate}],
                         lr=learning_rate, momentum=momentum, weight_decay=weight_decay)
     scheduler = StepLR(optimizer, step_size=options.step_steplr, gamma=options.gamma_steplr)
+    
+    snapshot_manager = SnapshotManager(snapshot_dir=checkpoint_dir, logging_frequency=1, snapshot_frequency=1)
+    epoch = snapshot_manager.restore(model, optimizer)
 
     loss_list = []#track training loss
     iou_list = []#track validaiton iou
@@ -98,7 +102,8 @@ def meta_train(options):
     tempory_loss = 0  # accumulated loss
     model = model.train()
     best_epoch=0
-    for epoch in range(0,num_epoch):
+    snapshot_manager.enable_time_tracking()
+    for epoch in range(epoch, num_epoch):
         print('Running epoch ', epoch, ' from ', num_epoch)
         print('Epoch:', epoch,'LR:', scheduler.get_lr())
         begin_time = time.time()
@@ -146,6 +151,11 @@ def meta_train(options):
                 np.savetxt(os.path.join(checkpoint_dir, 'loss_history.txt'), np.array(loss_list))
                 tempory_loss = 0
         scheduler.step()
+        # Save epoch checkpoint
+        snapshot_manager.register(iteration=epoch, training_loss=float(loss),
+                                  validation_loss=np.nan, 
+                                  model=model, optimizer=optimizer)
+        
 
         # ======================evaluate now==================
         with torch.no_grad():
