@@ -10,18 +10,18 @@ from common.gen_experiments import gen_experiments_dir, find_variables
 os.environ['LANG'] = 'en_CA.UTF-8'
 
 if __name__ == "__main__":
-    exp_description = "test_run_all_folds"
+    exp_description = "test_two_seeds"
     # This is the 5-way 5-sot configuration
     params = dict(
         fold=[0,1,2,3],
         ckpt='testing',
         split='val',
         data_dir='/mnt/datasets/public/research/pascal/VOCdevkit/VOC2012/',
-        film=[0,1],
+        film=0,
         use_web=0,
         save_vis='VIS_DIR',
         model_type=['nwe_coatt', 'nwe', 'coatt', 'iter_nwe_coatt'],
-        seed=1337
+        seed=[5982340, 120937]
     )
 
     parser = argparse.ArgumentParser()
