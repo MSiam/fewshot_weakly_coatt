@@ -14,3 +14,6 @@ cp -r Binary_map_aug/ $DATA_DIR
 
 # copy pretrained text embeddings to the data directory
 cp embeddings.npy $DATA_DIR
+
+# copy fold data
+cp -r data_files/ $DATA_DIR
