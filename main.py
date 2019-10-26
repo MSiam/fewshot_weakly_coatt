@@ -91,6 +91,12 @@ parser.add_argument('-resume',
                     help='epoch to resume from if 0 doesnt resume',
                     default=0)
 
+parser.add_argument('-train',
+                    type=int,
+                    help='flag to use training+testing or solely perform testing',
+                    default=1)
+
+
 parser.add_argument('-gamma_steplr',
                     type=float,
                     help='gamma used in step LR scheduler',
@@ -105,8 +111,8 @@ parser.add_argument('-step_steplr',
 def main(argv=None):
     options = parser.parse_args()
     options = Namespace(load_and_save_params(vars(options), options.exp_dir))
-    
-    meta_train(options)
+    if options.train:
+        meta_train(options)
     test(options)
 
 

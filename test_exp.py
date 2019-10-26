@@ -21,6 +21,7 @@ if __name__ == "__main__":
         use_web=0,
         save_vis='VIS_DIR',
         model_type=['nwe_coatt', 'nwe', 'coatt', 'iter_nwe_coatt'],
+        train=1,
         seed=1337
     )
 
@@ -34,7 +35,7 @@ if __name__ == "__main__":
     exp_dir = os.path.join(project_path, "experiments",
                            "%s_%s_%s" % (time.strftime("%y%m%d_%H%M%S"), exp_tag, exp_description))
 
-    
+
 
     # This is for the reproducibility purposes
     repo_path = '/mnt' + project_path

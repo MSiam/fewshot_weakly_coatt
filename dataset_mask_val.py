@@ -195,7 +195,7 @@ class OSLSMSetupDataset(Dataset):
                                                 seed)
         k_shot = 1
         self.query_class_support_list = self.parse_file(
-            os.path.join(self.data_dir, 'data_files/imgs_paths_%d_%d.txt'%(fold, k_shot)),
+            os.path.join('datasets/data_files/imgs_paths_%d_%d.txt'%(fold, k_shot)),
                                            k_shot)
 
     def parse_file(self, pth_txt, k_shot):
