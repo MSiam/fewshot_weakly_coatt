@@ -103,14 +103,12 @@ parser.add_argument('-step_steplr',
 
 
 def main(argv=None):
-  options = parser.parse_args()
-
-  options = Namespace(load_and_save_params(vars(options), options.exp_dir))
-  print(options)
-
-  meta_train(options)
-  test(options)
+    options = parser.parse_args()
+    options = Namespace(load_and_save_params(vars(options), options.exp_dir))
+    
+    meta_train(options)
+    test(options)
 
 
 if __name__ == '__main__':
-  main()
+    main()
