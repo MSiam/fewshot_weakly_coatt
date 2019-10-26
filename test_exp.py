@@ -17,12 +17,13 @@ if __name__ == "__main__":
         ckpt='testing',
         split='val',
         data_dir='/mnt/datasets/public/research/pascal/VOCdevkit/VOC2012/',
-        film=[0,1],
+        film=0,
         use_web=0,
         save_vis='VIS_DIR',
         model_type=['nwe_coatt', 'nwe', 'coatt', 'iter_nwe_coatt'],
         train=1,
-        seed=1337
+        seed=1337,
+        num_epoch=200
     )
 
     parser = argparse.ArgumentParser()

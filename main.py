@@ -108,6 +108,12 @@ parser.add_argument('-step_steplr',
                     default=50)
 
 
+parser.add_argument('-num_epoch',
+                    type=int,
+                    help='Number of epochs to train',
+                    default=200)
+
+
 def main(argv=None):
     options = parser.parse_args()
     options = Namespace(load_and_save_params(vars(options), options.exp_dir))

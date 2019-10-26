@@ -40,7 +40,7 @@ def meta_train(options):
     IMG_MEAN = [0.485, 0.456, 0.406]
     IMG_STD = [0.229, 0.224, 0.225]
     num_class = 2
-    num_epoch = 200
+    num_epoch = options.num_epoch
     learning_rate = options.lr  # 0.000025#0.00025
     input_size = (321, 321)
     batch_size = options.bs
