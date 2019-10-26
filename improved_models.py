@@ -103,9 +103,12 @@ class IterativeWordEmbedCoResNet(WordEmbedCoResNet):
         va2 = self.relu(self.reduction_cat(torch.cat([query_rgb, va2], dim=1)))
         vb2 = self.relu(self.reduction_cat(torch.cat([support_rgb, vb2], dim=1)))
 
+        va2 = va1 + va2
+        vb2 = vb1 + vb2
+
         va3, _ = self.coattend(va2, vb2, support_lbl)
 
-        z = va1 + va3
+        z = va2 + va3
 
         history_mask=F.interpolate(history_mask,feature_size,mode='bilinear',align_corners=True)
 
