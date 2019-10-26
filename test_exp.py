@@ -10,17 +10,17 @@ from common.gen_experiments import gen_experiments_dir, find_variables
 os.environ['LANG'] = 'en_CA.UTF-8'
 
 if __name__ == "__main__":
-    exp_description = "testing"
+    exp_description = "test_run_all_folds"
     # This is the 5-way 5-sot configuration
     params = dict(
-        fold=0,
+        fold=[0,1,2,3],
         ckpt='testing',
         split='val',
         data_dir='/mnt/datasets/public/research/pascal/VOCdevkit/VOC2012/',
-        film=0,
+        film=[0,1],
         use_web=0,
         save_vis='VIS_DIR',
-        model_type='nwe_coatt',
+        model_type=['nwe_coatt', 'nwe', 'coatt', 'iter_nwe_coatt'],
         seed=1337
     )
 
@@ -51,7 +51,7 @@ if __name__ == "__main__":
         "--cpu=2",
         "--gpu=1",
         "--mem=16",
-        "--restartable"
+        # "--restartable"
     ]
 
     cmd = os.path.join(repo_path, "main.py")
