@@ -18,6 +18,7 @@ import sys
 from torch.optim.lr_scheduler import StepLR
 from common.torch_utils import SnapshotManager
 
+
 def meta_train(options):
     data_dir = options.data_dir
 
@@ -42,6 +43,7 @@ def meta_train(options):
     IMG_STD = [0.229, 0.224, 0.225]
     num_class = 2
     num_epoch = options.num_epoch
+    step_steplr = num_epoch / 3.0
     learning_rate = options.lr  # 0.000025#0.00025
     input_size = (321, 321)
     batch_size = options.bs
@@ -61,49 +63,45 @@ def meta_train(options):
     # disable the  gradients of not optomized layers
     turn_off(model)
 
-    checkpoint_dir = options.ckpt+'/fo=%d/'% options.fold
-    if options.resume:
-        if os.path.exists(checkpoint_dir+'model/epoch_%04d.pth'%options.resume):
-            model.load_state_dict(torch.load(checkpoint_dir+'model/epoch_%04d.pth'%options.resume))
-        else:
-            print('Checkpoint does not exist')
-            sys.exit(0)
-    else:
-        check_dir(checkpoint_dir)
+    checkpoint_dir = os.path.join(options.exp_dir, options.ckpt, 'fo=%d'% options.fold)
+    check_dir(checkpoint_dir)
 
     # loading data
     # trainset
     dataset = Dataset_train(data_dir=data_dir, fold=options.fold, input_size=input_size, normalize_mean=IMG_MEAN,
                       normalize_std=IMG_STD, prob=options.prob, seed=options.seed)
     trainloader = data.DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=0)
-
-    # valset
-    # this only a quick val dataset where all images are 321*321.
-#    valset = Dataset_val(data_dir=data_dir, fold=options.fold, input_size=input_size, normalize_mean=IMG_MEAN,
-#                     normalize_std=IMG_STD, split=options.split, seed=options.seed)
-#    valloader = data.DataLoader(valset, batch_size=options.bs_val, shuffle=False, num_workers=4,
-#                                drop_last=False)
-
-    save_pred_every =len(trainloader)
+    save_pred_every = len(trainloader) - 1
 
     optimizer = optim.SGD([{'params': get_10x_lr_params(model, options.model_type, options.film),
                         'lr': 10 * learning_rate}],
                         lr=learning_rate, momentum=momentum, weight_decay=weight_decay)
-    scheduler = StepLR(optimizer, step_size=options.step_steplr, gamma=options.gamma_steplr)
-    
-    snapshot_manager = SnapshotManager(snapshot_dir=checkpoint_dir, logging_frequency=1, snapshot_frequency=1)
-    epoch = snapshot_manager.restore(model, optimizer)
-
-    loss_list = []#track training loss
-    iou_list = []#track validaiton iou
+    snapshot_manager = SnapshotManager(snapshot_dir=os.path.join(checkpoint_dir, 'snapshot'), 
+                                       logging_frequency=1, snapshot_frequency=1)
+    last_epoch = snapshot_manager.restore(model, optimizer)
+    print(f'Loaded epoch {last_epoch}')
+    if last_epoch == 0:
+        scheduler = StepLR(optimizer, step_size=step_steplr, gamma=options.gamma_steplr)
+        scheduler = StepLR(optimizer, step_size=step_steplr, gamma=options.gamma_steplr, last_epoch=0)
+        last_epoch = -1
+    else:
+        scheduler = StepLR(optimizer, step_size=step_steplr, gamma=options.gamma_steplr, last_epoch=last_epoch+1)
+        
+    loss_list = [] # track training loss
+    iou_list = [] # track validaiton iou
     highest_iou = 0
-
+    if len(snapshot_manager.losses['training']) > 0:
+        loss_list = list(snapshot_manager.losses['training'].values())
+    if len(snapshot_manager.losses['validation']) > 0:
+        iou_list = list(snapshot_manager.losses['validation'].values())
+        highest_iou = np.max(iou_list)
+        
     model.cuda()
     tempory_loss = 0  # accumulated loss
     model = model.train()
     best_epoch=0
     snapshot_manager.enable_time_tracking()
-    for epoch in range(epoch, num_epoch):
+    for epoch in range(last_epoch+1, num_epoch):
         print('Running epoch ', epoch, ' from ', num_epoch)
         print('Epoch:', epoch,'LR:', scheduler.get_lr())
         begin_time = time.time()
@@ -145,31 +143,23 @@ def meta_train(options):
             #save training loss
             tempory_loss += loss.item()
             if i_iter % save_pred_every == 0 and i_iter != 0:
-
                 loss_list.append(tempory_loss / save_pred_every)
                 plot_loss(checkpoint_dir, loss_list, save_pred_every)
                 np.savetxt(os.path.join(checkpoint_dir, 'loss_history.txt'), np.array(loss_list))
                 tempory_loss = 0
-        scheduler.step()
-        # Save epoch checkpoint
-        snapshot_manager.register(iteration=epoch, training_loss=float(loss),
-                                  validation_loss=np.nan, 
-                                  model=model, optimizer=optimizer)
         
-
         # ======================evaluate now==================
         with torch.no_grad():
             print ('----Evaluation----')
             model = model.eval()
 
-#            valset.history_mask_list=[None] * 1000
             best_iou = 0
             initial_seed = options.seed #+ epoch
             for eva_iter in range(options.iter_time):
                 valset = Dataset_val(data_dir=data_dir, fold=options.fold, input_size=input_size, normalize_mean=IMG_MEAN,
                                      normalize_std=IMG_STD, split=options.split, seed=initial_seed+eva_iter)
                 valset.history_mask_list=[None] * 1000
-                valloader = data.DataLoader(valset, batch_size=options.bs_val, shuffle=False, num_workers=4,
+                valloader = data.DataLoader(valset, batch_size=options.bs_val, shuffle=False, num_workers=0,
                                             drop_last=False)
 
                 all_inter, all_union, all_predict = [0] * 15, [0] * 15, [0] * 15
@@ -205,7 +195,6 @@ def meta_train(options):
                         all_union[sample_class[j] - (options.fold * 5 + 1)] += union_list[j]
 
                 IOU = []
-
                 for j in range(15):
                     if all_union[j] != 0:
                         IOU.append(all_inter[j] / all_union[j])
@@ -220,8 +209,7 @@ def meta_train(options):
             iou_list.append(best_iou)
             plot_iou(checkpoint_dir, iou_list)
             np.savetxt(os.path.join(checkpoint_dir, 'iou_history.txt'), np.array(iou_list))
-            torch.save(model.cpu().state_dict(), osp.join(checkpoint_dir, 'model', 'epoch_%04d'%epoch+'.pth'))
-
+            
             if best_iou>highest_iou:
                 highest_iou = best_iou
                 model = model.eval()
@@ -239,3 +227,12 @@ def meta_train(options):
         print('best epoch:%d ,iout:%.4f' % (best_epoch, highest_iou))
         print('This epoch taks:', epoch_time, 'second')
         print('still need hour:%.4f' % ((num_epoch - epoch) * epoch_time / 3600))
+            
+        scheduler.step()
+        # Save epoch checkpoint
+        snapshot_manager.register(iteration=epoch, 
+                                  training_loss=float(loss_list[-1]) if len(loss_list) > 0 else np.nan,
+                                  validation_loss=best_iou, 
+                                  model=model, optimizer=optimizer)
+        
+        

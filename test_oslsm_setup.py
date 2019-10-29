@@ -35,10 +35,10 @@ def test(options):
     model = Res_Deeplab(data_dir=data_dir, num_classes=num_class, model_type=options.model_type, filmed=options.film)
 
     #load trained parameter
-    checkpoint_dir = options.ckpt+'/fo=%d/'% options.fold
-    logger = open(checkpoint_dir+'final_test_miou.txt', 'w')
+    checkpoint_dir = os.path.join(options.exp_dir, options.ckpt, 'fo=%d'% options.fold)
+    logger = open(os.path.join(checkpoint_dir, 'final_test_miou.txt'), 'w')
     model=nn.DataParallel(model,[0])
-    model.load_state_dict(torch.load(checkpoint_dir+'model/best.pth'))
+    model.load_state_dict(torch.load(os.path.join(checkpoint_dir, 'model/best.pth')))
 
     if options.use_web:
         Dataset_val = WebSetupDataset
@@ -47,7 +47,7 @@ def test(options):
 
     inferset = Dataset_val(data_dir=data_dir, fold=options.fold, input_size=input_size, normalize_mean=IMG_MEAN,
                              normalize_std=IMG_STD, seed=1386)
-    valloader = data.DataLoader(inferset, batch_size=options.bs, shuffle=False, num_workers=4,
+    valloader = data.DataLoader(inferset, batch_size=options.bs, shuffle=False, num_workers=0,
                                 drop_last=False)
 
     if options.save_vis != '' and not os.path.exists(options.save_vis):
