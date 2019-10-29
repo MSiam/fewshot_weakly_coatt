@@ -17,6 +17,7 @@ import numpy as np
 import sys
 from torch.optim.lr_scheduler import StepLR
 from common.torch_utils import SnapshotManager
+from tensorboardX import SummaryWriter
 
 
 def meta_train(options):
@@ -95,7 +96,8 @@ def meta_train(options):
     if len(snapshot_manager.losses['validation']) > 0:
         iou_list = list(snapshot_manager.losses['validation'].values())
         highest_iou = np.max(iou_list)
-        
+    
+    tensorboard = SummaryWriter(log_dir = os.path.join(checkpoint_dir, 'tensorboard'))
     model.cuda()
     tempory_loss = 0  # accumulated loss
     model = model.train()
@@ -225,14 +227,20 @@ def meta_train(options):
 
         epoch_time = time.time() - begin_time
         print('best epoch:%d ,iout:%.4f' % (best_epoch, highest_iou))
-        print('This epoch taks:', epoch_time, 'second')
+        print('This epoch takes:', epoch_time, 'second')
         print('still need hour:%.4f' % ((num_epoch - epoch) * epoch_time / 3600))
-            
-        scheduler.step()
+        
         # Save epoch checkpoint
+        training_loss = float(loss_list[-1]) if len(loss_list) > 0 else np.nan
         snapshot_manager.register(iteration=epoch, 
-                                  training_loss=float(loss_list[-1]) if len(loss_list) > 0 else np.nan,
+                                  training_loss=training_loss,
                                   validation_loss=best_iou, 
                                   model=model, optimizer=optimizer)
+        # Log epoch metrics
+        tensorboard.add_scalar('validation/best_iou', best_iou, epoch)
+        tensorboard.add_scalar('training/loss', training_loss, epoch)
+        tensorboard.add_scalar('training/learning_rate', scheduler.get_lr(), epoch)
         
+        scheduler.step()
         
+    tensorboard.close()
