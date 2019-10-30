@@ -11,7 +11,7 @@ os.environ['LANG'] = 'en_CA.UTF-8'
 
 if __name__ == "__main__":
     exp_description = "test_restartable"
-    # This is the 5-way 5-sot configuration
+    # This is the 5-way 5-shot configuration
     params = dict(
         fold=[0],
         ckpt='testing',
@@ -24,9 +24,9 @@ if __name__ == "__main__":
         train=1,
         seed=[1337],
         num_epoch=[180, 120, 60],
-        gamma_steplr=[0.1, 0.5],
-        bs=[4, 8, 16],
-        lr=[0.00025, 0.0005, 0.000125],
+        gamma_steplr=[1.0, 0.5],
+        bs=[4, 8],
+        lr=[0.00025, 0.0005, 0.001, 0.005],
     )
 
     parser = argparse.ArgumentParser()

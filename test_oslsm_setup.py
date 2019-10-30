@@ -11,6 +11,8 @@ from utils import *
 import numpy as np
 import os
 import cv2
+from common.torch_utils import SnapshotManager
+
 
 def save(save_dir, support_rgb, support_mask, query_rgb, pred, iter_i):
     for i, (srgb, smask, qrgb, p) in \
@@ -40,13 +42,18 @@ def test(options):
     model=nn.DataParallel(model,[0])
     model.load_state_dict(torch.load(os.path.join(checkpoint_dir, 'model/best.pth')))
 
+#     snapshot_manager = SnapshotManager(snapshot_dir=os.path.join(checkpoint_dir, 'snapshot'),
+#                                        logging_frequency=1, snapshot_frequency=1)
+#     last_epoch = snapshot_manager.restore(model, optimizer=None)
+#     print(f'Restored epoch {last_epoch}')
+
     if options.use_web:
         Dataset_val = WebSetupDataset
     else:
         Dataset_val = OSLSMSetupDataset
 
     inferset = Dataset_val(data_dir=data_dir, fold=options.fold, input_size=input_size, normalize_mean=IMG_MEAN,
-                             normalize_std=IMG_STD, seed=1386)
+                             normalize_std=IMG_STD, seed=1386) 
     valloader = data.DataLoader(inferset, batch_size=options.bs, shuffle=False, num_workers=0,
                                 drop_last=False)
 
