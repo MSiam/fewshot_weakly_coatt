@@ -82,6 +82,7 @@ def meta_train(options):
     last_epoch = snapshot_manager.restore(model, optimizer)
     print(f'Loaded epoch {last_epoch}')
     if last_epoch == 0:
+        scheduler = StepLR(optimizer, step_size=step_steplr, gamma=options.gamma_steplr)
         scheduler = StepLR(optimizer, step_size=step_steplr, gamma=options.gamma_steplr, last_epoch=0)
         last_epoch = -1
     else:
