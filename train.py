@@ -55,7 +55,8 @@ def meta_train(options):
     cudnn.enabled = True
 
     # Create network.
-    model = Res_Deeplab(data_dir=data_dir, num_classes=num_class, model_type=options.model_type, filmed=options.film)
+    model = Res_Deeplab(data_dir=data_dir, num_classes=num_class, model_type=options.model_type,
+                        filmed=options.film, embed=options.embed_type)
 
     # load resnet-50 preatrained parameter
     model = load_resnet50_param(model, stop_layer='layer4')
@@ -77,7 +78,7 @@ def meta_train(options):
     optimizer = optim.SGD([{'params': get_10x_lr_params(model, options.model_type, options.film),
                         'lr': 10 * learning_rate}],
                         lr=learning_rate, momentum=momentum, weight_decay=weight_decay)
-    snapshot_manager = SnapshotManager(snapshot_dir=os.path.join(checkpoint_dir, 'snapshot'), 
+    snapshot_manager = SnapshotManager(snapshot_dir=os.path.join(checkpoint_dir, 'snapshot'),
                                        logging_frequency=1, snapshot_frequency=1)
     last_epoch = snapshot_manager.restore(model, optimizer)
     print(f'Loaded epoch {last_epoch}')
@@ -87,7 +88,7 @@ def meta_train(options):
         last_epoch = -1
     else:
         scheduler = StepLR(optimizer, step_size=step_steplr, gamma=options.gamma_steplr, last_epoch=last_epoch+1)
-        
+
     loss_list = [] # track training loss
     iou_list = [] # track validaiton iou
     highest_iou = 0
@@ -96,7 +97,7 @@ def meta_train(options):
     if len(snapshot_manager.losses['validation']) > 0:
         iou_list = list(snapshot_manager.losses['validation'].values())
         highest_iou = np.max(iou_list)
-    
+
     tensorboard = SummaryWriter(log_dir = os.path.join(checkpoint_dir, 'tensorboard'))
     model.cuda()
     tempory_loss = 0  # accumulated loss
@@ -149,7 +150,7 @@ def meta_train(options):
                 plot_loss(checkpoint_dir, loss_list, save_pred_every)
                 np.savetxt(os.path.join(checkpoint_dir, 'loss_history.txt'), np.array(loss_list))
                 tempory_loss = 0
-        
+
         # ======================evaluate now==================
         with torch.no_grad():
             print ('----Evaluation----')
@@ -211,7 +212,7 @@ def meta_train(options):
             iou_list.append(best_iou)
             plot_iou(checkpoint_dir, iou_list)
             np.savetxt(os.path.join(checkpoint_dir, 'iou_history.txt'), np.array(iou_list))
-            
+
             if best_iou>highest_iou:
                 highest_iou = best_iou
                 model = model.eval()
@@ -229,18 +230,18 @@ def meta_train(options):
         print('best epoch:%d ,iout:%.4f' % (best_epoch, highest_iou))
         print('This epoch takes:', epoch_time, 'second')
         print('still need hour:%.4f' % ((num_epoch - epoch) * epoch_time / 3600))
-        
+
         # Save epoch checkpoint
         training_loss = float(loss_list[-1]) if len(loss_list) > 0 else np.nan
-        snapshot_manager.register(iteration=epoch, 
+        snapshot_manager.register(iteration=epoch,
                                   training_loss=training_loss,
-                                  validation_loss=best_iou, 
+                                  validation_loss=best_iou,
                                   model=model, optimizer=optimizer)
         # Log epoch metrics
         tensorboard.add_scalar('validation/best_iou', best_iou, epoch)
         tensorboard.add_scalar('training/loss', training_loss, epoch)
         tensorboard.add_scalar('training/learning_rate', scheduler.get_lr(), epoch)
-        
+
         scheduler.step()
-        
+
     tensorboard.close()

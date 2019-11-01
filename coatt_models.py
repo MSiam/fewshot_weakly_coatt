@@ -90,11 +90,23 @@ class CoResNet(ResNet):
         return out
 
 class WordEmbedCoResNet(CoResNet):
-    def __init__(self, block, layers, num_classes, film_gen=None, data_dir='./datasets/'):
+    def __init__(self, block, layers, num_classes, film_gen=None, data_dir='./datasets/',
+                 embed='word2vec'):
         super(WordEmbedCoResNet, self).__init__(block, layers, num_classes)
-        self.linear_word_embedding = nn.Linear(300, 256, bias=False)
         self.film_gen = film_gen
-        self.word2vec = np.load(os.path.join(data_dir, 'embeddings.npy'), allow_pickle=True).item()
+        if embed == 'word2vec':
+            self.word2vec = np.load(os.path.join(data_dir, 'embeddings.npy'),
+                                    allow_pickle=True).item()
+            self.linear_word_embedding = nn.Linear(300, 256, bias=False)
+        elif embed == 'fasttext':
+            self.word2vec = np.load(os.path.join(data_dir, 'fsttxt.npy'),
+                                    allow_pickle=True).item()
+            self.linear_word_embedding = nn.Linear(300, 256, bias=False)
+        elif embed == 'concat':
+            self.word2vec = np.load(os.path.join(data_dir, 'concatenated_embed.npy'),
+                                    allow_pickle=True).item()
+            self.linear_word_embedding = nn.Linear(600, 256, bias=False)
+
         self.classes = ['plane', 'bicycle', 'bird', 'boat',
                         'bottle', 'bus', 'car', 'cat', 'chair',
                         'cow', 'table', 'dog', 'horse',
@@ -145,7 +157,7 @@ class WordEmbedCoResNet(CoResNet):
             cls = self.classes[cls-1]
             word_embedding.append(torch.tensor(self.word2vec[cls]))
 
-        word_embedding = torch.stack(word_embedding).cuda()
+        word_embedding = torch.stack(word_embedding).cuda().float()
         return word_embedding
 
     def coattend(self, va, vb, word_embedding):
@@ -259,10 +271,21 @@ class WordEmbedCoResNet(CoResNet):
         return out
 
 class WordEmbedResNet(CoResNet):
-    def __init__(self, block, layers, num_classes, data_dir='./datasets/'):
+    def __init__(self, block, layers, num_classes, data_dir='./datasets/', embed='word2vec'):
         super(WordEmbedResNet, self).__init__(block, layers, num_classes)
-        self.linear_word_embedding = nn.Linear(300, 256, bias=False)
-        self.word2vec = np.load(os.path.join(data_dir, 'embeddings.npy'), allow_pickle=True).item()
+        if embed == 'word2vec':
+            self.word2vec = np.load(os.path.join(data_dir, 'embeddings.npy'),
+                                    allow_pickle=True).item()
+            self.linear_word_embedding = nn.Linear(300, 256, bias=False)
+        elif embed == 'fasttext':
+            self.word2vec = np.load(os.path.join(data_dir, 'fsttxt.npy'),
+                                    allow_pickle=True).item()
+            self.linear_word_embedding = nn.Linear(300, 256, bias=False)
+        elif embed == 'concat':
+            self.word2vec = np.load(os.path.join(data_dir, 'concatenated_embed.npy'),
+                                    allow_pickle=True).item()
+            self.linear_word_embedding = nn.Linear(600, 256, bias=False)
+
         self.classes = ['plane', 'bicycle', 'bird', 'boat',
                         'bottle', 'bus', 'car', 'cat', 'chair',
                         'cow', 'table', 'dog', 'horse',
@@ -285,7 +308,7 @@ class WordEmbedResNet(CoResNet):
             cls = self.classes[cls-1]
             word_embedding.append(torch.tensor(self.word2vec[cls]))
 
-        word_embedding = torch.stack(word_embedding).cuda()
+        word_embedding = torch.stack(word_embedding).cuda().float()
         word_embedding = self.linear_word_embedding(word_embedding)
 
         word_embedding = word_embedding.unsqueeze(2).unsqueeze(2)

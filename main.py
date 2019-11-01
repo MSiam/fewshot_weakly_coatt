@@ -107,11 +107,16 @@ parser.add_argument('-step_steplr',
                     help='step in step LR scheduler',
                     default=50)
 
-
 parser.add_argument('-num_epoch',
                     type=int,
                     help='Number of epochs to train',
                     default=200)
+
+parser.add_argument('-embed_type',
+                    type=str,
+                    default='word2vec',
+                    help='word2vec / fasttext / concat')
+
 
 
 def main(argv=None):
