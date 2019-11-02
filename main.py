@@ -57,7 +57,9 @@ parser.add_argument('-iter_time',
 parser.add_argument('-split',
                     type=str,
                     default='val',
-                    help='split of classes to validate upon')
+                    help='trainval: train classes but val imgs during validation, \
+                          val: val classes and val imgs during validation, \
+                          test: val class and val imgs during fewshot test')
 
 parser.add_argument('-film',
                     type=int,
@@ -117,15 +119,24 @@ parser.add_argument('-embed_type',
                     default='word2vec',
                     help='word2vec / fasttext / concat')
 
+parser.add_argument('-test_multi_run',
+                    type=int,
+                    default=0)
 
 
 def main(argv=None):
     options = parser.parse_args()
-    options = Namespace(load_and_save_params(vars(options), options.exp_dir))
+    if options.split not in ['trainval', 'val', 'test']:
+        print('Error in split')
+
+    #options = Namespace(load_and_save_params(vars(options), options.exp_dir))
     if options.train:
         meta_train(options)
-    test(options)
 
+    if options.test_multi_run:
+        test_multi_runs(options)
+    else:
+        test(options)
 
 if __name__ == '__main__':
     main()

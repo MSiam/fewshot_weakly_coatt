@@ -47,7 +47,7 @@ def test(options):
         Dataset_val = OSLSMSetupDataset
 
     inferset = Dataset_val(data_dir=data_dir, fold=options.fold, input_size=input_size, normalize_mean=IMG_MEAN,
-                             normalize_std=IMG_STD, seed=1386)
+                             normalize_std=IMG_STD, seed=options.seed)
     valloader = data.DataLoader(inferset, batch_size=options.bs, shuffle=False, num_workers=0,
                                 drop_last=False)
 
@@ -65,6 +65,8 @@ def test(options):
         inferset.history_mask_list=[None] * 1000
         best_iou = 0
         all_inter, all_union, all_predict = [0] * 5, [0] * 5, [0] * 5
+        all_fgbg_iou = []
+
         for i_iter, batch in enumerate(valloader):
             print('Iteration ', i_iter)
             query_rgb, query_mask, support_rgb, support_mask, history_mask, sprt_original, qry_original, \
@@ -98,9 +100,17 @@ def test(options):
                     pred_label, i_iter*options.bs)
 
             inter_list, union_list, _, num_predict_list = get_iou_v1(query_mask, pred_label)
+            inter_list_bg, union_list_bg, _, num_predict_list = get_iou_v1(query_mask, pred_label,
+                                                                           mode='background')
+
+            iou_fgbg = []
             for j in range(query_mask.shape[0]):#batch size
                 all_inter[sample_class[j] - (options.fold * 5 + 1)] += inter_list[j]
                 all_union[sample_class[j] - (options.fold * 5 + 1)] += union_list[j]
+                iou_fgbg.append(np.array([inter_list[j] / union_list[j],
+                                          inter_list_bg[j] / union_list_bg[j]]).mean())
+
+            all_fgbg_iou.append(np.mean(iou_fgbg))
 
         IOU = [0] * 5
 
@@ -108,5 +118,6 @@ def test(options):
             IOU[j] = all_inter[j] / all_union[j]
 
         mean_iou = np.mean(IOU)
-        logger.write('IOU:%.4f\n' % (mean_iou))
+        fgbg_mean_iou = np.mean(all_fgbg_iou)
+        logger.write('IOU:%.4f , FgBg IOU:%.4f\n' % (mean_iou, fgbg_mean_iou))
         logger.close()

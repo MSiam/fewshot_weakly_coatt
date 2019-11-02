@@ -11,8 +11,6 @@ import time
 import glob
 
 class Dataset(object):
-
-
     def __init__(self, data_dir, fold, input_size=[321, 321], normalize_mean=[0, 0, 0],
                  normalize_std=[1, 1, 1], seed=None, split='val'):
 
@@ -52,7 +50,7 @@ class Dataset(object):
     def get_new_exist_class_dict(self, fold):
         new_exist_class_list = []
 
-        if self.split == 'train':
+        if self.split == 'trainval':
             fold_list=[0,1,2,3]
             fold_list.remove(fold)
             for fold in fold_list:
@@ -64,10 +62,9 @@ class Dataset(object):
                     img_name = item[:11]
                     cat = int(item[13:15])
                     new_exist_class_list.append([img_name, cat])
-            self.split = 'val' # Validates on validation images but using training classes
         else:
-            f = open(os.path.join(self.data_dir, 'Binary_map_aug', self.split, \
-                     'split%1d_'%(fold)+ self.split + '.txt'))
+            f = open(os.path.join(self.data_dir, 'Binary_map_aug', 'val', \
+                     'split%1d_'%(fold)+ 'val' + '.txt'))
             while True:
                 item = f.readline()
                 if item == '':
@@ -85,7 +82,7 @@ class Dataset(object):
         binary_pair_list = {}
         for Class in range(1, 21):
             binary_pair_list[Class] = self.read_txt(
-                os.path.join(self.data_dir, 'Binary_map_aug', self.split, '%d.txt' % Class))
+                os.path.join(self.data_dir, 'Binary_map_aug', 'val', '%d.txt' % Class))
         return binary_pair_list
 
     def read_txt(self, dir):
@@ -103,16 +100,22 @@ class Dataset(object):
         sample_class = self.query_class_support_list[index][1]  # random sample a class in this img
         support_name=self.query_class_support_list[index][2]
 
-
         input_size = self.input_size[0]
-        # random scale and crop for support
-        scaled_size = int(self.rand.uniform(1,1.5)*input_size)
+        # random scale and crop for support only during validation not testing
+        if self.split == 'test':
+            scaled_size = input_size
+        else:
+            scaled_size = int(self.rand.uniform(1,1.5)*input_size)
+
         scale_transform_mask = torchvision.transforms.Resize([scaled_size, scaled_size], interpolation=Image.NEAREST)
         scale_transform_rgb = torchvision.transforms.Resize([scaled_size, scaled_size], interpolation=Image.BILINEAR)
 
-        flip_flag = self.rand.random()
-        margin_h = self.rand.randint(0, scaled_size - input_size)
-        margin_w = self.rand.randint(0, scaled_size - input_size)
+        if self.split == 'test': # No flipping during testing
+            flip_flag = 0
+        else:
+            flip_flag = self.rand.random()
+            margin_h = self.rand.randint(0, scaled_size - input_size)
+            margin_w = self.rand.randint(0, scaled_size - input_size)
 
         support_rgb = self.normalize(
             self.ToTensor(
@@ -128,11 +131,12 @@ class Dataset(object):
             scale_transform_mask(
                 self.flip(flip_flag,
                           Image.open(
-                              os.path.join(self.data_dir, 'Binary_map_aug', self.split, str(sample_class),
+                              os.path.join(self.data_dir, 'Binary_map_aug', 'val', str(sample_class),
                                            support_name + '.png')))))
-        support_rgb = support_rgb[:, margin_h:margin_h + input_size, margin_w:margin_w + input_size]
-        support_mask = support_mask[:, margin_h:margin_h + input_size, margin_w:margin_w + input_size]
-        support_original = support_original[margin_h:margin_h + input_size, margin_w:margin_w + input_size, :]
+        if self.split != 'test': # No margins either during testing
+            support_rgb = support_rgb[:, margin_h:margin_h + input_size, margin_w:margin_w + input_size]
+            support_mask = support_mask[:, margin_h:margin_h + input_size, margin_w:margin_w + input_size]
+            support_original = support_original[margin_h:margin_h + input_size, margin_w:margin_w + input_size, :]
 
 
         # random scale and crop for query
@@ -157,23 +161,21 @@ class Dataset(object):
             scale_transform_mask(
                 self.flip(flip_flag,
                           Image.open(
-                              os.path.join(self.data_dir, 'Binary_map_aug', self.split, str(sample_class),
+                              os.path.join(self.data_dir, 'Binary_map_aug', 'val', str(sample_class),
                                            query_name + '.png')))))
-        margin_h = self.rand.randint(0, scaled_size - input_size)
-        margin_w = self.rand.randint(0, scaled_size - input_size)
+        if self.split != 'test':
+            margin_h = self.rand.randint(0, scaled_size - input_size)
+            margin_w = self.rand.randint(0, scaled_size - input_size)
 
-        query_rgb = query_rgb[:, margin_h:margin_h + input_size, margin_w:margin_w + input_size]
-        query_mask = query_mask[:, margin_h:margin_h + input_size, margin_w:margin_w + input_size]
+            query_rgb = query_rgb[:, margin_h:margin_h + input_size, margin_w:margin_w + input_size]
+            query_mask = query_mask[:, margin_h:margin_h + input_size, margin_w:margin_w + input_size]
 
         if self.history_mask_list[index] is None:
-
             history_mask=torch.zeros(2,41,41).fill_(0.0)
-
         else:
-
             history_mask=self.history_mask_list[index]
 
-        return query_rgb, query_mask, support_rgb, support_mask,history_mask, \
+        return query_rgb, query_mask, support_rgb, support_mask, history_mask, \
                     support_original, qry_original, sample_class,index
 
     def flip(self, flag, img):
@@ -195,8 +197,8 @@ class OSLSMSetupDataset(Dataset):
                                                 seed)
         k_shot = 1
         self.query_class_support_list = self.parse_file(
-            os.path.join(self.data_dir, 'data_files', 'imgs_paths_%d_%d.txt'%(fold, k_shot)),
-                                           k_shot)
+               os.path.join(self.data_dir, 'data_files', 'imgs_paths_%d_%d.txt'%(fold, k_shot)),
+                k_shot)
 
     def parse_file(self, pth_txt, k_shot):
         files = []
@@ -249,7 +251,7 @@ class OSLSMSetupDataset(Dataset):
             scale_transform_mask(
                 self.flip(flip_flag,
                           Image.open(
-                              os.path.join(self.data_dir, 'Binary_map_aug', self.split, str(sample_class),
+                              os.path.join(self.data_dir, 'Binary_map_aug', 'val', str(sample_class),
                                            support_name + '.png')))))
         support_rgb = support_rgb[:, margin_h:margin_h + input_size, margin_w:margin_w + input_size]
         support_mask = support_mask[:, margin_h:margin_h + input_size, margin_w:margin_w + input_size]
@@ -278,7 +280,7 @@ class OSLSMSetupDataset(Dataset):
             scale_transform_mask(
                 self.flip(flip_flag,
                           Image.open(
-                              os.path.join(self.data_dir, 'Binary_map_aug', self.split, str(sample_class),
+                              os.path.join(self.data_dir, 'Binary_map_aug', 'val', str(sample_class),
                                            query_name + '.png')))))
         margin_h = 0
         margin_w = 0
