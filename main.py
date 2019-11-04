@@ -129,7 +129,7 @@ def main(argv=None):
     if options.split not in ['trainval', 'val', 'test']:
         print('Error in split')
 
-    #options = Namespace(load_and_save_params(vars(options), options.exp_dir))
+    options = Namespace(load_and_save_params(vars(options), options.exp_dir))
     if options.train:
         meta_train(options)
 
