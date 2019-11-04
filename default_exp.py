@@ -10,12 +10,32 @@ from common.gen_experiments import gen_experiments_dir, find_variables
 os.environ['LANG'] = 'en_CA.UTF-8'
 
 if __name__ == "__main__":
-    exp_description = "test_restartable"
+#     exp_description = "adam_optimizer_and_clipping"
     # This is the 5-way 5-sot configuration
+#     params = dict(
+#         fold=[0],
+#         ckpt='testing',
+#         split=['train'],
+#         data_dir='/mnt/datasets/public/research/pascal/VOCdevkit/VOC2012/',
+#         film=0,
+#         use_web=0,
+#         save_vis='VIS_DIR',
+#         model_type=['nwe', 'iter_nwe_coatt'],
+#         train=1,
+#         seed=[1337],
+#         num_epoch=[120, 180],
+#         gamma_steplr=[1.0, 0.5],
+#         bs=4,
+#         optimizer=['adam'],
+#         clip_gradient_norm=[5.0],
+#         lr=[2e-6, 1e-6],
+#     )
+    
+    exp_description = "sgd_train_validaton"
     params = dict(
-        fold=[0],
+        fold=[0, 1, 2, 3],
         ckpt='testing',
-        split='val',
+        split=['train', 'val'],
         data_dir='/mnt/datasets/public/research/pascal/VOCdevkit/VOC2012/',
         film=0,
         use_web=0,
@@ -23,11 +43,14 @@ if __name__ == "__main__":
         model_type=['nwe', 'iter_nwe_coatt'],
         train=1,
         seed=[1337],
-        num_epoch=[180, 120, 60],
-        gamma_steplr=[0.1, 0.5],
-        bs=[4, 8, 16],
-        lr=[0.00025, 0.0005, 0.000125],
+        num_epoch=200,
+        gamma_steplr=1.0,
+        bs=4,
+        optimizer='sgd',
+        clip_gradient_norm=5000,
+        lr=[0.00025, 0.001],
     )
+
 
     parser = argparse.ArgumentParser()
     parser.add_argument(

@@ -113,6 +113,16 @@ parser.add_argument('-num_epoch',
                     help='Number of epochs to train',
                     default=200)
 
+parser.add_argument('-clip_gradient_norm',
+                    type=float,
+                    help='The value of max parameter norm',
+                    default=None)
+
+parser.add_argument('-optimizer',
+                    type=str,
+                    help='The optimizer type (Adam or sgd)',
+                    default='sgd')
+
 
 def main(argv=None):
     options = parser.parse_args()

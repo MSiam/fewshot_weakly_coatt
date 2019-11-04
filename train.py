@@ -18,6 +18,7 @@ import sys
 from torch.optim.lr_scheduler import StepLR
 from common.torch_utils import SnapshotManager
 from tensorboardX import SummaryWriter
+from test_oslsm_setup import test
 
 
 def meta_train(options):
@@ -71,12 +72,20 @@ def meta_train(options):
     # trainset
     dataset = Dataset_train(data_dir=data_dir, fold=options.fold, input_size=input_size, normalize_mean=IMG_MEAN,
                       normalize_std=IMG_STD, prob=options.prob, seed=options.seed)
-    trainloader = data.DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=0)
+    trainloader = data.DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=4)
     save_pred_every = len(trainloader) - 1
-
-    optimizer = optim.SGD([{'params': get_10x_lr_params(model, options.model_type, options.film),
-                        'lr': 10 * learning_rate}],
-                        lr=learning_rate, momentum=momentum, weight_decay=weight_decay)
+    
+    if options.optimizer == 'sgd':
+        optimizer = optim.SGD([{'params': get_10x_lr_params(model, options.model_type, options.film),
+                            'lr': 10 * learning_rate}],
+                            lr=learning_rate, momentum=momentum, weight_decay=weight_decay)
+    elif options.optimizer == 'adam':
+        optimizer = optim.Adam([{'params': get_10x_lr_params(model, options.model_type, options.film),
+                            'lr': 10 * learning_rate}],
+                            lr=learning_rate, weight_decay=weight_decay)
+    else:
+        raise Exception(f'unknown optimizer option: {options.optimizer}')
+        
     snapshot_manager = SnapshotManager(snapshot_dir=os.path.join(checkpoint_dir, 'snapshot'), 
                                        logging_frequency=1, snapshot_frequency=1)
     last_epoch = snapshot_manager.restore(model, optimizer)
@@ -136,6 +145,10 @@ def meta_train(options):
 
             loss = loss_calc_v1(pred, query_mask, 0)
             loss.backward()
+            if options.clip_gradient_norm:
+                gradient_norm = nn.utils.clip_grad_norm(model.parameters(), options.clip_gradient_norm)
+            else:
+                gradient_norm = 0.0
             optimizer.step()
 
             tqdm_gen.set_description('e:%d loss = %.4f-:%.4f' % (
@@ -161,7 +174,7 @@ def meta_train(options):
                 valset = Dataset_val(data_dir=data_dir, fold=options.fold, input_size=input_size, normalize_mean=IMG_MEAN,
                                      normalize_std=IMG_STD, split=options.split, seed=initial_seed+eva_iter)
                 valset.history_mask_list=[None] * 1000
-                valloader = data.DataLoader(valset, batch_size=options.bs_val, shuffle=False, num_workers=0,
+                valloader = data.DataLoader(valset, batch_size=options.bs_val, shuffle=False, num_workers=4,
                                             drop_last=False)
 
                 all_inter, all_union, all_predict = [0] * 15, [0] * 15, [0] * 15
@@ -240,7 +253,10 @@ def meta_train(options):
         tensorboard.add_scalar('validation/best_iou', best_iou, epoch)
         tensorboard.add_scalar('training/loss', training_loss, epoch)
         tensorboard.add_scalar('training/learning_rate', scheduler.get_lr(), epoch)
-        
+        tensorboard.add_scalar('training/gradient_norm', gradient_norm, epoch)
+        test_miou = test(options, mode='last')
+        tensorboard.add_scalar('test/mean_iou', test_miou, epoch)
+                
         scheduler.step()
         
     tensorboard.close()

@@ -294,3 +294,47 @@ class WordEmbedResNet(CoResNet):
         za = self.reduction(va)
         return za
 
+    
+class WordEmbedProtoResNet(CoResNet):
+    def __init__(self, block, layers, num_classes, data_dir='./datasets/'):
+        super(WordEmbedProtoResNet, self).__init__(block, layers, num_classes)
+        self.linear_word_embedding = nn.Linear(300, 256, bias=False)
+        self.word2vec = np.load(os.path.join(data_dir, 'embeddings.npy'), allow_pickle=True).item()
+        self.classes = ['plane', 'bicycle', 'bird', 'boat',
+                        'bottle', 'bus', 'car', 'cat', 'chair',
+                        'cow', 'table', 'dog', 'horse',
+                        'motorbike', 'person', 'plant',
+                        'sheep', 'sofa', 'train', 'monitor']
+        self.reduction = nn.Conv2d(256*3, 256, 1, bias=False)
+        self.reduction_proto = nn.Conv2d(256*2, 256, 1, bias=False)
+
+    def coattend(self, va, vb, sprt_l):
+        """
+        Performs coattention between support set and query set
+        va: query features
+        vb: support features
+        sprt_l: support image-level label
+        """
+        channel = va.shape[1]*2
+        fea_size = va.shape[2:]
+
+        word_embedding = []
+        for cls in sprt_l:
+            cls = self.classes[cls-1]
+            word_embedding.append(torch.tensor(self.word2vec[cls]))
+
+        word_embedding = torch.stack(word_embedding).cuda()
+        word_embedding = self.linear_word_embedding(word_embedding)
+
+        word_embedding = word_embedding.unsqueeze(2).unsqueeze(2)
+        word_embedding_tiled = word_embedding.repeat(1, 1, va.shape[2], va.shape[3])
+        
+        vb = torch.cat((vb, word_embedding_tiled), 1)
+        vb = self.reduction_proto(vb)
+        feature_size = vb.shape[-2:]
+        vb_proto = F.avg_pool2d(vb, kernel_size=feature_size)
+        vb_proto = vb_proto.repeat(1, 1, vb.shape[2], vb.shape[3])
+                
+        va = torch.cat((va, word_embedding_tiled, vb_proto), 1)
+        za = self.reduction(va)
+        return za
