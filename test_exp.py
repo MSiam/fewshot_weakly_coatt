@@ -10,7 +10,7 @@ from common.gen_experiments import gen_experiments_dir, find_variables
 os.environ['LANG'] = 'en_CA.UTF-8'
 
 if __name__ == "__main__":
-    exp_description = "test_restartable"
+    exp_description = "test_integration"
     # This is the 5-way 5-sot configuration
     params = dict(
         fold=0,
@@ -24,9 +24,9 @@ if __name__ == "__main__":
         train=1,
         seed=1337,
         num_epoch=10,
-        gamma_steplr=0.1,
+        gamma_steplr=1.0,
         bs=4,
-        lr=0.00025,
+        lr=0.001,
     )
 
     parser = argparse.ArgumentParser()
@@ -48,6 +48,7 @@ if __name__ == "__main__":
 
     borgy_args = [
         "--image=images.borgy.elementai.net/fewshot_webly:boris",
+        "--shm-size", "4G",
         "-w", "/",
         "-e", "PYTHONPATH=%s" % repo_path,
         "-e", "DATA_PATH=/mnt/datasets/public/",
