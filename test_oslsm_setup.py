@@ -11,6 +11,8 @@ from utils import *
 import numpy as np
 import os
 import cv2
+from common.torch_utils import SnapshotManager
+
 
 def save(save_dir, support_rgb, support_mask, query_rgb, pred, iter_i):
     for i, (srgb, smask, qrgb, p) in \
@@ -20,7 +22,8 @@ def save(save_dir, support_rgb, support_mask, query_rgb, pred, iter_i):
         cv2.imwrite(save_dir+'/sprt_lbl/'+'%05d'%(iter_i+i)+'.png', smask[0].cpu().numpy())
         cv2.imwrite(save_dir+'/qry_pred/'+'%05d'%(iter_i+i)+'.png', p.cpu().numpy())
 
-def test(options):
+        
+def test(options, mode='best'):
     data_dir = options.data_dir
     torch.backends.cudnn.benchmark = True
 
@@ -39,7 +42,13 @@ def test(options):
     checkpoint_dir = os.path.join(options.exp_dir, options.ckpt, 'fo=%d'% options.fold)
     logger = open(os.path.join(checkpoint_dir, 'final_test_miou.txt'), 'w')
     model=nn.DataParallel(model,[0])
-    model.load_state_dict(torch.load(os.path.join(checkpoint_dir, 'model/best.pth')))
+    if mode == 'best':
+        model.load_state_dict(torch.load(os.path.join(checkpoint_dir, 'model/best.pth')))
+    elif mode == 'last':
+        snapshot_manager = SnapshotManager(snapshot_dir=os.path.join(checkpoint_dir, 'snapshot'),
+                                           logging_frequency=1, snapshot_frequency=1)
+        last_epoch = snapshot_manager.restore(model, optimizer=None)
+        print(f'Restored epoch {last_epoch}')
 
     if options.use_web:
         Dataset_val = WebSetupDataset
@@ -48,7 +57,7 @@ def test(options):
 
     inferset = Dataset_val(data_dir=data_dir, fold=options.fold, input_size=input_size, normalize_mean=IMG_MEAN,
                              normalize_std=IMG_STD, seed=options.seed)
-    valloader = data.DataLoader(inferset, batch_size=options.bs, shuffle=False, num_workers=0,
+    valloader = data.DataLoader(inferset, batch_size=options.bs, shuffle=False, num_workers=1,
                                 drop_last=False)
 
     if options.save_vis != '' and not os.path.exists(options.save_vis):
@@ -121,3 +130,6 @@ def test(options):
         fgbg_mean_iou = np.mean(all_fgbg_iou)
         logger.write('IOU:%.4f , FgBg IOU:%.4f\n' % (mean_iou, fgbg_mean_iou))
         logger.close()
+        
+        print(f'Mean IOU: {mean_iou}')
+        return mean_iou

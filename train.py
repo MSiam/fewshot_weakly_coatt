@@ -20,6 +20,7 @@ from torch.optim.lr_scheduler import StepLR
 from common.torch_utils import SnapshotManager
 from tensorboardX import SummaryWriter
 from coco import create_coco_fewshot
+from test_oslsm_setup import test
 
 def meta_train(options):
     data_dir = options.data_dir
@@ -85,7 +86,7 @@ def meta_train(options):
                                       n_ways=1, n_shots=1, max_iters=30000, fold=options.fold,
                                       prob=options.prob, seed=options.seed)
 
-    trainloader = data.DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=0)
+    trainloader = data.DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=1)
     save_pred_every = len(trainloader) - 1
 
     optimizer = optim.SGD([{'params': get_10x_lr_params(model, options.model_type, options.film),
@@ -191,7 +192,7 @@ def meta_train(options):
                                                  prob=options.prob, seed=initial_seed+eva_iter)
 
                 valset.history_mask_list=[None] * 1000
-                valloader = data.DataLoader(valset, batch_size=options.bs_val, shuffle=False, num_workers=0,
+                valloader = data.DataLoader(valset, batch_size=options.bs_val, shuffle=False, num_workers=1,
                                             drop_last=False)
 
                 all_inter, all_union, all_predict = [0] * nfold_out_classes, [0] * nfold_out_classes, [0] * nfold_out_classes
@@ -270,6 +271,9 @@ def meta_train(options):
         tensorboard.add_scalar('validation/best_iou', best_iou, epoch)
         tensorboard.add_scalar('training/loss', training_loss, epoch)
         tensorboard.add_scalar('training/learning_rate', scheduler.get_lr(), epoch)
+
+        test_miou = test(options, mode='last')
+        tensorboard.add_scalar('test/mean_iou', test_miou, epoch)
 
         scheduler.step()
 
