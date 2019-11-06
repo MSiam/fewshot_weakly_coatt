@@ -323,3 +323,85 @@ class WordEmbedResNet(CoResNet):
         za = self.reduction(va)
         return za
 
+
+class WordEmbedProtoResNet(CoResNet):
+    def __init__(self, block, layers, num_classes, data_dir='./datasets/', embed='word2vec'):
+        super(WordEmbedProtoResNet, self).__init__(block, layers, num_classes)
+        
+        self.word_embedding_type = 'non-linear'
+        
+        if embed == 'word2vec':
+            self.word2vec = np.load(os.path.join(data_dir, 'embeddings.npy'),
+                                    allow_pickle=True).item()
+            self.linear_word_embedding = nn.Linear(300, 256, 
+                                                   bias=self.word_embedding_type=='non-linear')
+        elif embed == 'fasttext':
+            self.word2vec = np.load(os.path.join(data_dir, 'fsttxt.npy'),
+                                    allow_pickle=True).item()
+            self.linear_word_embedding = nn.Linear(300, 256, 
+                                                   bias=self.word_embedding_type=='non-linear')
+        elif embed == 'concat':
+            self.word2vec = np.load(os.path.join(data_dir, 'concatenated_embed.npy'),
+                                    allow_pickle=True).item()
+            self.linear_word_embedding = nn.Linear(600, 256, 
+                                                   bias=self.word_embedding_type=='non-linear')
+        
+        self.classes = ['plane', 'bicycle', 'bird', 'boat',
+                        'bottle', 'bus', 'car', 'cat', 'chair',
+                        'cow', 'table', 'dog', 'horse',
+                        'motorbike', 'person', 'plant',
+                        'sheep', 'sofa', 'train', 'monitor']
+        self.reduction = nn.Conv2d(256*2, 256, 1, bias=False)
+        self.reduction_soft_mask = nn.Conv2d(256*2, 1, 1, bias=True)
+        self.hidden_mixer = nn.Linear(256, 256, bias=True)
+        self.reduction_mixer = nn.Linear(256, 1, bias=True)
+        
+        self.relu = nn.ReLU(inplace=True)
+        self.sigmoid = nn.Sigmoid()
+        self.dropout = nn.Dropout(p=0.1, inplace=False)
+        self.non_linear_word_embedding = nn.Linear(256, 256, bias=False)
+
+    def coattend(self, va, vb, sprt_l):
+        """
+        Performs coattention between support set and query set
+        va: query features
+        vb: support features
+        sprt_l: support image-level label
+        """
+        channel = va.shape[1]*2
+        fea_size = va.shape[2:]
+
+        word_embedding = []
+        for cls in sprt_l:
+            cls = self.classes[cls-1]
+            word_embedding.append(torch.tensor(self.word2vec[cls]))
+
+        word_embedding = torch.stack(word_embedding).cuda()
+        word_embedding = self.linear_word_embedding(word_embedding)
+        if self.word_embedding_type == 'non-linear':
+            word_embedding = self.relu(word_embedding)
+            word_embedding = self.dropout(word_embedding)
+            word_embedding = self.non_linear_word_embedding(word_embedding)
+
+        word_embedding_tiled = word_embedding.unsqueeze(2).unsqueeze(2)
+        word_embedding_tiled = word_embedding_tiled.repeat(1, 1, va.shape[2], va.shape[3])
+
+        vb_mask = torch.cat((vb, word_embedding_tiled), 1)
+        vb_mask = self.reduction_soft_mask(vb_mask)
+        vb_mask = self.sigmoid(vb_mask)
+        
+        feature_size = vb.shape[-2:]
+        vb_proto = F.avg_pool2d(vb * vb_mask, kernel_size=feature_size)
+        vb_proto = vb_proto.repeat(1, 1, vb.shape[2], vb.shape[3])
+        
+        mixer = self.hidden_mixer(word_embedding)
+        mixer = self.relu(mixer)
+        mixer = self.dropout(mixer)
+        mixer = self.reduction_mixer(mixer)
+        mixer = self.sigmoid(mixer).unsqueeze(2).unsqueeze(2)
+        
+        mixed_prototype = word_embedding_tiled * mixer + (1.0-mixer) * vb_proto
+        
+        va = torch.cat((va, mixed_prototype), 1)
+        za = self.reduction(va)
+        return za
