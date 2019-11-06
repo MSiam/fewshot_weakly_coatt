@@ -39,7 +39,11 @@ RUN conda install -y pymongo pandas jupyter pillow requests matplotlib tqdm \
 
 RUN pip install pyyaml celery tensorflow-gpu==1.8.0 tensorboard==1.8.0 statsmodels gitpython \ 
     scikit-image opencv-python scikit-learn googledrivedownloader scipy torchvision==0.4.1 \
-    numpy==1.17.3 tensorboardX torch==1.3.0 cython pycocotools
+    numpy==1.17.3 tensorboardX torch==1.3.0 
+    
+RUN  pip install --upgrade cython
+
+RUN  pip install pycocotools
 
 ENTRYPOINT [ "/usr/bin/tini", "--" ]
 
