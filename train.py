@@ -25,6 +25,9 @@ from test_oslsm_setup import test
 def meta_train(options):
     data_dir = options.data_dir
 
+    torch.backends.cudnn.benchmark = True
+    torch.backends.cudnn.deterministic = True
+
     torch.manual_seed(options.seed)
     torch.cuda.manual_seed(options.seed)
     np.random.seed(options.seed)
@@ -39,8 +42,6 @@ def meta_train(options):
     gpu_list = [int(x) for x in options.gpu.split(',')]
     os.environ['CUDA_DEVICE_ORDER'] = 'PCI_BUS_ID'
     os.environ['CUDA_VISIBLE_DEVICES'] = options.gpu
-
-    torch.backends.cudnn.benchmark = True
 
     IMG_MEAN = [0.485, 0.456, 0.406]
     IMG_STD = [0.229, 0.224, 0.225]
