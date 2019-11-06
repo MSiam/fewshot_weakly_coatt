@@ -91,27 +91,31 @@ class CoResNet(ResNet):
 
 class WordEmbedCoResNet(CoResNet):
     def __init__(self, block, layers, num_classes, film_gen=None, data_dir='./datasets/',
-                 embed='word2vec'):
+                 embed='word2vec', dataset_name='pascal'):
         super(WordEmbedCoResNet, self).__init__(block, layers, num_classes)
         self.film_gen = film_gen
         if embed == 'word2vec':
-            self.word2vec = np.load(os.path.join(data_dir, 'embeddings.npy'),
-                                    allow_pickle=True).item()
             self.linear_word_embedding = nn.Linear(300, 256, bias=False)
         elif embed == 'fasttext':
-            self.word2vec = np.load(os.path.join(data_dir, 'fsttxt.npy'),
-                                    allow_pickle=True).item()
             self.linear_word_embedding = nn.Linear(300, 256, bias=False)
         elif embed == 'concat':
-            self.word2vec = np.load(os.path.join(data_dir, 'concatenated_embed.npy'),
-                                    allow_pickle=True).item()
             self.linear_word_embedding = nn.Linear(600, 256, bias=False)
 
-        self.classes = ['plane', 'bicycle', 'bird', 'boat',
-                        'bottle', 'bus', 'car', 'cat', 'chair',
-                        'cow', 'table', 'dog', 'horse',
-                        'motorbike', 'person', 'plant',
-                        'sheep', 'sofa', 'train', 'monitor']
+        self.word2vec = np.load(os.path.join(data_dir, 'embeddings_%s_%s.npy'%(embed, dataset_name)),\
+                                allow_pickle=True).item()
+        if dataset_name == 'pascal':
+            self.classes = ['plane', 'bicycle', 'bird', 'boat',
+                            'bottle', 'bus', 'car', 'cat', 'chair',
+                            'cow', 'table', 'dog', 'horse',
+                            'motorbike', 'person', 'plant',
+                            'sheep', 'sofa', 'train', 'monitor']
+        elif dataset_name == 'coco':
+            self.classes = []
+            classes_f = open(os.path.join(data_dir, 'coco_classes.txt'), 'r')
+            for line in classes_f:
+                self.classes.append(line.strip().replace(' ', '_'))
+            classes_f.close()
+
         if self.film_gen is None:
             self.linear_e = nn.Linear(512, 512, bias = False)
             self.reduction = nn.Conv2d(512, 256, 1, bias=False)
@@ -271,26 +275,28 @@ class WordEmbedCoResNet(CoResNet):
         return out
 
 class WordEmbedResNet(CoResNet):
-    def __init__(self, block, layers, num_classes, data_dir='./datasets/', embed='word2vec'):
+    def __init__(self, block, layers, num_classes, data_dir='./datasets/', embed='word2vec', dataset_name='pascal'):
         super(WordEmbedResNet, self).__init__(block, layers, num_classes)
         if embed == 'word2vec':
-            self.word2vec = np.load(os.path.join(data_dir, 'embeddings.npy'),
-                                    allow_pickle=True).item()
             self.linear_word_embedding = nn.Linear(300, 256, bias=False)
         elif embed == 'fasttext':
-            self.word2vec = np.load(os.path.join(data_dir, 'fsttxt.npy'),
-                                    allow_pickle=True).item()
             self.linear_word_embedding = nn.Linear(300, 256, bias=False)
         elif embed == 'concat':
-            self.word2vec = np.load(os.path.join(data_dir, 'concatenated_embed.npy'),
-                                    allow_pickle=True).item()
             self.linear_word_embedding = nn.Linear(600, 256, bias=False)
 
-        self.classes = ['plane', 'bicycle', 'bird', 'boat',
-                        'bottle', 'bus', 'car', 'cat', 'chair',
-                        'cow', 'table', 'dog', 'horse',
-                        'motorbike', 'person', 'plant',
-                        'sheep', 'sofa', 'train', 'monitor']
+        if dataset_name == 'pascal':
+            self.classes = ['plane', 'bicycle', 'bird', 'boat',
+                            'bottle', 'bus', 'car', 'cat', 'chair',
+                            'cow', 'table', 'dog', 'horse',
+                            'motorbike', 'person', 'plant',
+                            'sheep', 'sofa', 'train', 'monitor']
+        elif dataset_name == 'coco':
+            self.classes = []
+            classes_f = open(os.path.join(data_dir, 'coco_classes.txt'), 'r')
+            for line in classes_f:
+                self.classes.append(line.strip().replace(' ', '_'))
+            classes_f.close()
+
         self.reduction = nn.Conv2d(512, 256, 1, bias=False)
 
     def coattend(self, va, vb, sprt_l):

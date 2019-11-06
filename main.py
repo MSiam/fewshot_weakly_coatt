@@ -4,6 +4,7 @@
 import argparse
 from train import meta_train
 from test_oslsm_setup import test
+from test_multi_runs import test_multi_runs
 from common.gen_experiments import load_and_save_params, Namespace
 
 parser = argparse.ArgumentParser()
@@ -56,7 +57,7 @@ parser.add_argument('-iter_time',
 
 parser.add_argument('-split',
                     type=str,
-                    default='val',
+                    default='trainval',
                     help='trainval: train classes but val imgs during validation, \
                           val: val classes and val imgs during validation, \
                           test: val class and val imgs during fewshot test')
@@ -123,6 +124,10 @@ parser.add_argument('-test_multi_run',
                     type=int,
                     default=0)
 
+parser.add_argument('-dataset_name',
+                    type=str,
+                    default='pascal',
+                    help='Name of dataset: pascal/coco')
 
 def main(argv=None):
     options = parser.parse_args()

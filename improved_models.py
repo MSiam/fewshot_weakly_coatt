@@ -7,9 +7,10 @@ from coatt_models import WordEmbedCoResNet
 #code of dilated convolution part is referenced from https://github.com/speedinghzl/Pytorch-Deeplab
 
 class IterativeWordEmbedCoResNet(WordEmbedCoResNet):
-    def __init__(self, block, layers, num_classes, data_dir='./datasets/', embed='word2vec'):
+    def __init__(self, block, layers, num_classes, data_dir='./datasets/', embed='word2vec', dataset_name='pascal'):
         super(IterativeWordEmbedCoResNet, self).__init__(block, layers, num_classes,
-                                                         data_dir=data_dir, embed=embed)
+                                                         data_dir=data_dir, embed=embed,
+                                                         dataset_name=dataset_name)
         self.reduction_cat = nn.Conv2d(512, 256, 1, bias=False)
 
     def coattend(self, va, vb, sprt_l):

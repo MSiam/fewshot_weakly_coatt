@@ -9,6 +9,7 @@ import tqdm
 import random
 from dataset_mask_train import Dataset as Dataset_train
 from dataset_mask_val import Dataset as Dataset_val
+from coco import create_coco_fewshot
 import os
 import torch
 from models import Res_Deeplab
@@ -18,7 +19,7 @@ import sys
 from torch.optim.lr_scheduler import StepLR
 from common.torch_utils import SnapshotManager
 from tensorboardX import SummaryWriter
-
+from coco import create_coco_fewshot
 
 def meta_train(options):
     data_dir = options.data_dir
@@ -51,12 +52,18 @@ def meta_train(options):
     weight_decay = 0.0005
     momentum = 0.9
     power = 0.9
+    if options.dataset_name == 'pascal':
+        nfold_classes = 5
+        nfold_out_classes = 15
+    else:
+        nfold_classes = 20
+        nfold_out_classes = 60
 
     cudnn.enabled = True
 
     # Create network.
     model = Res_Deeplab(data_dir=data_dir, num_classes=num_class, model_type=options.model_type,
-                        filmed=options.film, embed=options.embed_type)
+                        filmed=options.film, embed=options.embed_type, dataset_name=options.dataset_name)
 
     # load resnet-50 preatrained parameter
     model = load_resnet50_param(model, stop_layer='layer4')
@@ -70,8 +77,14 @@ def meta_train(options):
 
     # loading data
     # trainset
-    dataset = Dataset_train(data_dir=data_dir, fold=options.fold, input_size=input_size, normalize_mean=IMG_MEAN,
-                      normalize_std=IMG_STD, prob=options.prob, seed=options.seed)
+    if options.dataset_name == 'pascal':
+        dataset = Dataset_train(data_dir=data_dir, fold=options.fold, input_size=input_size, normalize_mean=IMG_MEAN,
+                                normalize_std=IMG_STD, prob=options.prob, seed=options.seed)
+    else:
+        dataset, cat_ids = create_coco_fewshot(data_dir, 'train', input_size=input_size,
+                                      n_ways=1, n_shots=1, max_iters=30000, fold=options.fold,
+                                      prob=options.prob, seed=options.seed)
+
     trainloader = data.DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=0)
     save_pred_every = len(trainloader) - 1
 
@@ -88,6 +101,16 @@ def meta_train(options):
         last_epoch = -1
     else:
         scheduler = StepLR(optimizer, step_size=step_steplr, gamma=options.gamma_steplr, last_epoch=last_epoch+1)
+
+    # Compute mapping used for setting validation mIoU
+    mapping = {}
+    fold_out_classes = set(range(nfold_classes+nfold_out_classes)) - \
+                        set(range(options.fold*nfold_classes, (options.fold+1)*nfold_classes))
+    for it, c in enumerate(fold_out_classes):
+        if options.dataset_name == 'coco': # In case of MS COCO use category ids its not continuous class numbers
+            mapping[cat_ids[c]] = it
+        else:
+            mapping[c] = it
 
     loss_list = [] # track training loss
     iou_list = [] # track validaiton iou
@@ -110,46 +133,46 @@ def meta_train(options):
         begin_time = time.time()
         tqdm_gen = tqdm.tqdm(trainloader)
 
-        for i_iter, batch in enumerate(tqdm_gen):
-            query_rgb, query_mask,support_rgb, support_mask,history_mask,sample_class,index= batch
-
-            query_rgb = (query_rgb).cuda(0)
-            support_rgb = (support_rgb).cuda(0)
-            support_mask = (support_mask).cuda(0)
-            query_mask = (query_mask).cuda(0).long()  # change formation for crossentropy use
-            query_mask = query_mask[:, 0, :, :]  # remove the second dim,change formation for crossentropy use
-            history_mask=(history_mask).cuda(0)
-
-
-            optimizer.zero_grad()
-            if options.model_type == 'vanilla':
-                pred=model(query_rgb, support_rgb, support_mask,history_mask)
-            else:
-                pred=model(query_rgb, support_rgb, sample_class,history_mask)
-            pred_softmax=F.softmax(pred,dim=1).data.cpu()
-
-            #update history mask
-            for j in range (support_mask.shape[0]):
-                sub_index=index[j]
-                dataset.history_mask_list[sub_index]=pred_softmax[j]
-
-            pred = nn.functional.interpolate(pred,size=input_size, mode='bilinear',align_corners=True)#upsample
-
-            loss = loss_calc_v1(pred, query_mask, 0)
-            loss.backward()
-            optimizer.step()
-
-            tqdm_gen.set_description('e:%d loss = %.4f-:%.4f' % (
-            epoch, loss.item(),highest_iou))
-
-
-            #save training loss
-            tempory_loss += loss.item()
-            if i_iter % save_pred_every == 0 and i_iter != 0:
-                loss_list.append(tempory_loss / save_pred_every)
-                plot_loss(checkpoint_dir, loss_list, save_pred_every)
-                np.savetxt(os.path.join(checkpoint_dir, 'loss_history.txt'), np.array(loss_list))
-                tempory_loss = 0
+#        for i_iter, batch in enumerate(tqdm_gen):
+#            query_rgb, query_mask,support_rgb, support_mask,history_mask, _, _, sample_class,index= batch
+#
+#            query_rgb = (query_rgb).cuda(0)
+#            support_rgb = (support_rgb).cuda(0)
+#            support_mask = (support_mask).cuda(0)
+#            query_mask = (query_mask).cuda(0).long()  # change formation for crossentropy use
+#            query_mask = query_mask[:, 0, :, :]  # remove the second dim,change formation for crossentropy use
+#            history_mask=(history_mask).cuda(0)
+#
+#
+#            optimizer.zero_grad()
+#            if options.model_type == 'vanilla':
+#                pred=model(query_rgb, support_rgb, support_mask,history_mask)
+#            else:
+#                pred=model(query_rgb, support_rgb, sample_class,history_mask)
+#            pred_softmax=F.softmax(pred,dim=1).data.cpu()
+#
+#            #update history mask
+#            for j in range (support_mask.shape[0]):
+#                sub_index=index[j]
+#                dataset.history_mask_list[sub_index]=pred_softmax[j]
+#
+#            pred = nn.functional.interpolate(pred,size=input_size, mode='bilinear',align_corners=True)#upsample
+#
+#            loss = loss_calc_v1(pred, query_mask, 0)
+#            loss.backward()
+#            optimizer.step()
+#
+#            tqdm_gen.set_description('e:%d loss = %.4f-:%.4f' % (
+#            epoch, loss.item(),highest_iou))
+#
+#
+#            #save training loss
+#            tempory_loss += loss.item()
+#            if i_iter % save_pred_every == 0 and i_iter != 0:
+#                loss_list.append(tempory_loss / save_pred_every)
+#                plot_loss(checkpoint_dir, loss_list, save_pred_every)
+#                np.savetxt(os.path.join(checkpoint_dir, 'loss_history.txt'), np.array(loss_list))
+#                tempory_loss = 0
 
         # ======================evaluate now==================
         with torch.no_grad():
@@ -159,16 +182,22 @@ def meta_train(options):
             best_iou = 0
             initial_seed = options.seed #+ epoch
             for eva_iter in range(options.iter_time):
-                valset = Dataset_val(data_dir=data_dir, fold=options.fold, input_size=input_size, normalize_mean=IMG_MEAN,
-                                     normalize_std=IMG_STD, split=options.split, seed=initial_seed+eva_iter)
+                if options.dataset_name == 'pascal':
+                    valset = Dataset_val(data_dir=data_dir, fold=options.fold, input_size=input_size, normalize_mean=IMG_MEAN,
+                                         normalize_std=IMG_STD, split=options.split, seed=initial_seed+eva_iter)
+                else:
+                    valset, _ = create_coco_fewshot(data_dir, 'trainval', input_size=input_size,
+                                                 n_ways=1, n_shots=1, max_iters=1000, fold=options.fold,
+                                                 prob=options.prob, seed=initial_seed+eva_iter)
+
                 valset.history_mask_list=[None] * 1000
                 valloader = data.DataLoader(valset, batch_size=options.bs_val, shuffle=False, num_workers=0,
                                             drop_last=False)
 
-                all_inter, all_union, all_predict = [0] * 15, [0] * 15, [0] * 15
+                all_inter, all_union, all_predict = [0] * nfold_out_classes, [0] * nfold_out_classes, [0] * nfold_out_classes
                 for i_iter, batch in enumerate(valloader):
-
-                    query_rgb, query_mask, support_rgb, support_mask, history_mask, orig, _, sample_class, index = batch
+                    print('Eva Iter ', i_iter)
+                    query_rgb, query_mask, support_rgb, support_mask, history_mask, _, _, sample_class, index = batch
                     query_rgb = (query_rgb).cuda(0)
                     support_rgb = (support_rgb).cuda(0)
                     support_mask = (support_mask).cuda(0)
@@ -194,11 +223,11 @@ def meta_train(options):
                     _, pred_label = torch.max(pred, 1)
                     inter_list, union_list, _, num_predict_list = get_iou_v1(query_mask, pred_label)
                     for j in range(query_mask.shape[0]):#batch size
-                        all_inter[sample_class[j] - (options.fold * 5 + 1)] += inter_list[j]
-                        all_union[sample_class[j] - (options.fold * 5 + 1)] += union_list[j]
+                        all_inter[mapping[int(sample_class[j])]] += inter_list[j]
+                        all_union[mapping[int(sample_class[j])]] += union_list[j]
 
                 IOU = []
-                for j in range(15):
+                for j in range(nfold_out_classes):
                     if all_union[j] != 0:
                         IOU.append(all_inter[j] / all_union[j])
 

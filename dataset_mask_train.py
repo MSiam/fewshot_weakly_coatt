@@ -73,15 +73,11 @@ class Dataset(object):
         query_name = self.new_exist_class_list[index][0]
         sample_class = self.new_exist_class_list[index][1]  # random sample a class in this img
 
-        # print (self.new_exist_class_list)
-
         support_img_list = self.binary_pair_list[sample_class]  # all img that contain the sample_class
         while True:  # random sample a support data
             support_name = support_img_list[self.rand.randint(0, len(support_img_list) - 1)]
             if support_name != query_name:
                 break
-
-        # print (query_name,support_name)
 
         input_size = self.input_size[0]
         # random scale and crop for support
@@ -96,6 +92,10 @@ class Dataset(object):
                               Image.open(
                                   os.path.join(self.data_dir, 'JPEGImages', support_name + '.jpg'))))))
 
+        support_original = np.array(
+                                scale_transform_rgb(
+                                    Image.open(os.path.join(self.data_dir, 'JPEGImages', support_name + '.jpg'))))
+
         support_mask = self.ToTensor(
             scale_transform_mask(
                 self.flip(flip_flag,
@@ -106,11 +106,8 @@ class Dataset(object):
         margin_h = self.rand.randint(0, scaled_size - input_size)
         margin_w = self.rand.randint(0, scaled_size - input_size)
         support_rgb = support_rgb[:, margin_h:margin_h + input_size, margin_w:margin_w + input_size]
+        support_original = support_original[margin_h:margin_h + input_size, margin_w:margin_w + input_size, :]
         support_mask = support_mask[:, margin_h:margin_h + input_size, margin_w:margin_w + input_size]
-
-
-
-
 
         # random scale and crop for query
         scaled_size = input_size  # random.randint(323, 350)
@@ -125,6 +122,11 @@ class Dataset(object):
                               Image.open(
                                   os.path.join(self.data_dir, 'JPEGImages', query_name + '.jpg'))))))
 
+        qry_original = np.array(
+                            scale_transform_rgb(
+                                Image.open(os.path.join(self.data_dir, 'JPEGImages', query_name + '.jpg'))))
+
+
         query_mask = self.ToTensor(
             scale_transform_mask(
                 self.flip(flip_flag,
@@ -136,9 +138,8 @@ class Dataset(object):
         margin_w = self.rand.randint(0, scaled_size - input_size)
 
         query_rgb = query_rgb[:, margin_h:margin_h + input_size, margin_w:margin_w + input_size]
+        qry_original = qry_original[margin_h:margin_h + input_size, margin_w:margin_w + input_size, :]
         query_mask = query_mask[:, margin_h:margin_h + input_size, margin_w:margin_w + input_size]
-
-
 
         if self.history_mask_list[index] is None:
 
@@ -150,8 +151,8 @@ class Dataset(object):
             else:
                 history_mask = torch.zeros(2, 41, 41).fill_(0.0)
 
-
-        return query_rgb, query_mask, support_rgb, support_mask,history_mask,sample_class,index
+        return query_rgb, query_mask, support_rgb, support_mask, history_mask, \
+                support_original, qry_original, sample_class, index
 
     def flip(self, flag, img):
         if flag > 0.5:

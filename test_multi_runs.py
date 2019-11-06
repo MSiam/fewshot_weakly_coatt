@@ -12,6 +12,7 @@ import numpy as np
 import os
 import cv2
 import signal, sys
+from coco import create_coco_fewshot
 
 def signal_handling(signum, frame):
     test = telegram_bot_sendtext('process aborted')
@@ -39,7 +40,7 @@ def test_multi_runs(options):
     cudnn.enabled = True
     # Create network.
     model = Res_Deeplab(data_dir=data_dir, num_classes=num_class, model_type=options.model_type,
-                        filmed=options.film, embed=options.embed_type)
+                        filmed=options.film, embed=options.embed_type, dataset_name=options.dataset_name)
 
     #load trained parameter
     checkpoint_dir = os.path.join(options.exp_dir, options.ckpt, 'fo=%d'% options.fold)
@@ -54,6 +55,14 @@ def test_multi_runs(options):
         os.mkdir(options.save_vis+'qry_pred')
         os.mkdir(options.save_vis+'sprt_lbl')
 
+    if options.dataset_name == 'pascal':
+        nfold_classes = 5
+        nfold_out_classes = 15
+    else:
+        nfold_classes = 20
+        nfold_out_classes = 60
+
+
     with torch.no_grad():
         print ('----Evaluation----')
         model = model.eval()
@@ -63,15 +72,21 @@ def test_multi_runs(options):
         eva_iters_fgbg_means = []
         for eva_iter in range(5):
             seed = options.seed + eva_iter
-            inferset = Dataset_val(data_dir=data_dir, fold=options.fold, input_size=input_size, normalize_mean=IMG_MEAN,
-                                     normalize_std=IMG_STD, seed=seed, split='test')
+            if options.dataset_name == 'pascal':
+                inferset = Dataset_val(data_dir=data_dir, fold=options.fold, input_size=input_size, normalize_mean=IMG_MEAN,
+                                         normalize_std=IMG_STD, seed=seed, split='test')
+            else:
+                inferset, cat_ids = create_coco_fewshot(data_dir, 'test', input_size=input_size,
+                                              n_ways=1, n_shots=1, max_iters=1000, fold=options.fold,
+                                              prob=options.prob, seed=seed)
+
             valloader = data.DataLoader(inferset, batch_size=options.bs, shuffle=False, num_workers=0,
                                         drop_last=False)
 
 
             inferset.history_mask_list=[None] * 1000
             best_iou = 0
-            all_inter, all_union, all_predict = [0] * 5, [0] * 5, [0] * 5
+            all_inter, all_union, all_predict = [0] * nfold_classes, [0] * nfold_classes, [0] * nfold_classes
             all_fgbg_iou = []
 
             signal.signal(signal.SIGINT, signal_handling)
@@ -113,17 +128,22 @@ def test_multi_runs(options):
 
                 iou_fgbg = []
                 for j in range(query_mask.shape[0]):#batch size
-                    all_inter[sample_class[j] - (options.fold * 5 + 1)] += inter_list[j]
-                    all_union[sample_class[j] - (options.fold * 5 + 1)] += union_list[j]
+                    if options.dataset_name == 'pascal':
+                        all_inter[sample_class[j] - (options.fold * nfold_classes + 1)] += inter_list[j]
+                        all_union[sample_class[j] - (options.fold * nfold_classes + 1)] += union_list[j]
+                    else:
+                        all_inter[cat_ids.index(sample_class[j]) - (options.fold * nfold_classes)] += inter_list[j]
+                        all_union[cat_ids.index(sample_class[j]) - (options.fold * nfold_classes)] += union_list[j]
+
                     iou_fgbg.append(np.array([inter_list[j] / union_list[j],
                                           inter_list_bg[j] / union_list_bg[j]]).mean())
 
                 all_fgbg_iou.append(np.mean(iou_fgbg))
 
 
-            IOU = [0] * 5
+            IOU = [0] * nfold_classes
 
-            for j in range(5):
+            for j in range(nfold_classes):
                 IOU[j] = all_inter[j] / all_union[j]
 
             mean_iou = np.mean(IOU)
