@@ -134,46 +134,46 @@ def meta_train(options):
         begin_time = time.time()
         tqdm_gen = tqdm.tqdm(trainloader)
 
-#        for i_iter, batch in enumerate(tqdm_gen):
-#            query_rgb, query_mask,support_rgb, support_mask,history_mask, _, _, sample_class,index= batch
-#
-#            query_rgb = (query_rgb).cuda(0)
-#            support_rgb = (support_rgb).cuda(0)
-#            support_mask = (support_mask).cuda(0)
-#            query_mask = (query_mask).cuda(0).long()  # change formation for crossentropy use
-#            query_mask = query_mask[:, 0, :, :]  # remove the second dim,change formation for crossentropy use
-#            history_mask=(history_mask).cuda(0)
-#
-#
-#            optimizer.zero_grad()
-#            if options.model_type == 'vanilla':
-#                pred=model(query_rgb, support_rgb, support_mask,history_mask)
-#            else:
-#                pred=model(query_rgb, support_rgb, sample_class,history_mask)
-#            pred_softmax=F.softmax(pred,dim=1).data.cpu()
-#
-#            #update history mask
-#            for j in range (support_mask.shape[0]):
-#                sub_index=index[j]
-#                dataset.history_mask_list[sub_index]=pred_softmax[j]
-#
-#            pred = nn.functional.interpolate(pred,size=input_size, mode='bilinear',align_corners=True)#upsample
-#
-#            loss = loss_calc_v1(pred, query_mask, 0)
-#            loss.backward()
-#            optimizer.step()
-#
-#            tqdm_gen.set_description('e:%d loss = %.4f-:%.4f' % (
-#            epoch, loss.item(),highest_iou))
-#
-#
-#            #save training loss
-#            tempory_loss += loss.item()
-#            if i_iter % save_pred_every == 0 and i_iter != 0:
-#                loss_list.append(tempory_loss / save_pred_every)
-#                plot_loss(checkpoint_dir, loss_list, save_pred_every)
-#                np.savetxt(os.path.join(checkpoint_dir, 'loss_history.txt'), np.array(loss_list))
-#                tempory_loss = 0
+        for i_iter, batch in enumerate(tqdm_gen):
+            query_rgb, query_mask,support_rgb, support_mask,history_mask, _, _, sample_class,index= batch
+
+            query_rgb = (query_rgb).cuda(0)
+            support_rgb = (support_rgb).cuda(0)
+            support_mask = (support_mask).cuda(0)
+            query_mask = (query_mask).cuda(0).long()  # change formation for crossentropy use
+            query_mask = query_mask[:, 0, :, :]  # remove the second dim,change formation for crossentropy use
+            history_mask=(history_mask).cuda(0)
+
+
+            optimizer.zero_grad()
+            if options.model_type == 'vanilla':
+                pred=model(query_rgb, support_rgb, support_mask,history_mask)
+            else:
+                pred=model(query_rgb, support_rgb, sample_class,history_mask)
+            pred_softmax=F.softmax(pred,dim=1).data.cpu()
+
+            #update history mask
+            for j in range (support_mask.shape[0]):
+                sub_index=index[j]
+                dataset.history_mask_list[sub_index]=pred_softmax[j]
+
+            pred = nn.functional.interpolate(pred,size=input_size, mode='bilinear',align_corners=True)#upsample
+
+            loss = loss_calc_v1(pred, query_mask, 0)
+            loss.backward()
+            optimizer.step()
+
+            tqdm_gen.set_description('e:%d loss = %.4f-:%.4f' % (
+            epoch, loss.item(),highest_iou))
+
+
+            #save training loss
+            tempory_loss += loss.item()
+            if i_iter % save_pred_every == 0 and i_iter != 0:
+                loss_list.append(tempory_loss / save_pred_every)
+                plot_loss(checkpoint_dir, loss_list, save_pred_every)
+                np.savetxt(os.path.join(checkpoint_dir, 'loss_history.txt'), np.array(loss_list))
+                tempory_loss = 0
 
         # ======================evaluate now==================
         with torch.no_grad():
