@@ -25,6 +25,7 @@ from test_oslsm_setup import test
 def meta_train(options):
     data_dir = options.data_dir
 
+    cudnn.enabled = True
     torch.backends.cudnn.benchmark = True
     torch.backends.cudnn.deterministic = True
 
@@ -60,8 +61,6 @@ def meta_train(options):
     else:
         nfold_classes = 20
         nfold_out_classes = 60
-
-    cudnn.enabled = True
 
     # Create network.
     model = Res_Deeplab(data_dir=data_dir, num_classes=num_class, model_type=options.model_type,
@@ -112,7 +111,7 @@ def meta_train(options):
         if options.dataset_name == 'coco': # In case of MS COCO use category ids its not continuous class numbers
             mapping[cat_ids[c]] = it
         else:
-            mapping[c] = it
+            mapping[c+1] = it
 
     loss_list = [] # track training loss
     iou_list = [] # track validaiton iou
