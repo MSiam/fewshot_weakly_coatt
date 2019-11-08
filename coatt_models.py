@@ -299,6 +299,7 @@ class WordEmbedResNet(CoResNet):
             self.linear_word_embedding = nn.Linear(600, 256, bias=False)
         self.word2vec = np.load(os.path.join(data_dir, 'embeddings_%s_%s.npy'%(embed, dataset_name)),\
                                 allow_pickle=True).item()
+
         if dataset_name == 'pascal':
             self.classes = ['plane', 'bicycle', 'bird', 'boat',
                             'bottle', 'bus', 'car', 'cat', 'chair',
@@ -340,32 +341,37 @@ class WordEmbedResNet(CoResNet):
 
 
 class WordEmbedProtoResNet(CoResNet):
-    def __init__(self, block, layers, num_classes, data_dir='./datasets/', embed='word2vec'):
+    def __init__(self, block, layers, num_classes, data_dir='./datasets/', embed='word2vec', dataset_name='pascal'):
         super(WordEmbedProtoResNet, self).__init__(block, layers, num_classes)
 
         self.word_embedding_type = 'non-linear'
 
         if embed == 'word2vec':
-            self.word2vec = np.load(os.path.join(data_dir, 'embeddings.npy'),
-                                    allow_pickle=True).item()
             self.linear_word_embedding = nn.Linear(300, 256,
                                                    bias=self.word_embedding_type=='non-linear')
         elif embed == 'fasttext':
-            self.word2vec = np.load(os.path.join(data_dir, 'fsttxt.npy'),
-                                    allow_pickle=True).item()
             self.linear_word_embedding = nn.Linear(300, 256,
                                                    bias=self.word_embedding_type=='non-linear')
         elif embed == 'concat':
-            self.word2vec = np.load(os.path.join(data_dir, 'concatenated_embed.npy'),
-                                    allow_pickle=True).item()
             self.linear_word_embedding = nn.Linear(600, 256,
                                                    bias=self.word_embedding_type=='non-linear')
 
-        self.classes = ['plane', 'bicycle', 'bird', 'boat',
-                        'bottle', 'bus', 'car', 'cat', 'chair',
-                        'cow', 'table', 'dog', 'horse',
-                        'motorbike', 'person', 'plant',
-                        'sheep', 'sofa', 'train', 'monitor']
+        self.word2vec = np.load(os.path.join(data_dir, 'embeddings_%s_%s.npy'%(embed, dataset_name)),\
+                                allow_pickle=True).item()
+
+        if dataset_name == 'pascal':
+            self.classes = ['plane', 'bicycle', 'bird', 'boat',
+                            'bottle', 'bus', 'car', 'cat', 'chair',
+                            'cow', 'table', 'dog', 'horse',
+                            'motorbike', 'person', 'plant',
+                            'sheep', 'sofa', 'train', 'monitor']
+        elif dataset_name == 'coco':
+            self.classes = []
+            classes_f = open(os.path.join(data_dir, 'coco_classes.txt'), 'r')
+            for line in classes_f:
+                self.classes.append(line.strip().replace(' ', '_'))
+            classes_f.close()
+
         self.reduction = nn.Conv2d(256*2, 256, 1, bias=False)
         self.reduction_soft_mask = nn.Conv2d(256*2, 1, 1, bias=True)
         self.hidden_mixer = nn.Linear(256, 256, bias=True)
@@ -373,7 +379,7 @@ class WordEmbedProtoResNet(CoResNet):
 
         self.relu = nn.ReLU(inplace=True)
         self.sigmoid = nn.Sigmoid()
-        self.dropout = nn.Dropout(p=0.1, inplace=False)
+        self.dropout = nn.Dropout(p=0.3, inplace=False)
         self.non_linear_word_embedding = nn.Linear(256, 256, bias=False)
 
     def coattend(self, va, vb, sprt_l):
@@ -391,7 +397,7 @@ class WordEmbedProtoResNet(CoResNet):
             cls = self.classes[cls-1]
             word_embedding.append(torch.tensor(self.word2vec[cls]))
 
-        word_embedding = torch.stack(word_embedding).cuda()
+        word_embedding = torch.stack(word_embedding).cuda().float()
         word_embedding = self.linear_word_embedding(word_embedding)
         if self.word_embedding_type == 'non-linear':
             word_embedding = self.relu(word_embedding)
