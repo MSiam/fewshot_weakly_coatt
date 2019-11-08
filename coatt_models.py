@@ -41,6 +41,10 @@ class CoResNet(ResNet):
         return za
 
     def forward(self, query_rgb, support_rgb, support_lbl, history_mask):
+        # Assuming always 1shot is working in coatt model
+        srgb_size = support_rgb.shape
+        support_rgb = support_rgb.view(-1, srgb_size[2], srgb_size[3], srgb_size[4])
+
         # important: do not optimize the RESNET backbone
         query_rgb = self.conv1(query_rgb)
         query_rgb = self.bn1(query_rgb)
@@ -202,6 +206,8 @@ class WordEmbedCoResNet(CoResNet):
 
     def forward(self, query_rgb, support_rgb, support_lbl, history_mask):
         nwe = self.extract_nwe(support_lbl)
+        srgb_size = support_rgb.shape
+        support_rgb = support_rgb.view(-1, srgb_size[2], srgb_size[3], srgb_size[4])
 
         if self.film_gen is not None:
             gammas_256 = self.film_gen.gen_gammas_256(nwe)
@@ -250,13 +256,21 @@ class WordEmbedCoResNet(CoResNet):
 
         h,w=support_rgb.shape[-2:][0],support_rgb.shape[-2:][1]
 
+        query_rgb_rep = query_rgb.unsqueeze(1).repeat(1, srgb_size[1], 1, 1, 1)
+        sqry_size = query_rgb_rep.shape
+        query_rgb_rep = query_rgb_rep.view(-1, sqry_size[2], sqry_size[3], sqry_size[4])
+
+        nwe_rep = nwe.unsqueeze(1).repeat(1, srgb_size[1], 1)
+        nwe_rep = nwe_rep.view(-1, nwe.shape[1])
         if self.film_gen is not None:
-            z = self.filmed_coattend(query_rgb, support_rgb, gammas_256,
+            z = self.filmed_coattend(query_rgb_rep, support_rgb, gammas_256,
                                      betas_256)
         else:
-            z = self.coattend(query_rgb, support_rgb, nwe)
+            z = self.coattend(query_rgb_rep, support_rgb, nwe_rep)
 
         history_mask=F.interpolate(history_mask,feature_size,mode='bilinear',align_corners=True)
+        z = z.view(srgb_size[0], srgb_size[1], z.shape[1], z.shape[2], z.shape[3])
+        z = torch.mean(z, dim=1)
 
         out=torch.cat([query_rgb,z],dim=1)
         out = self.layer55(out)
@@ -283,7 +297,8 @@ class WordEmbedResNet(CoResNet):
             self.linear_word_embedding = nn.Linear(300, 256, bias=False)
         elif embed == 'concat':
             self.linear_word_embedding = nn.Linear(600, 256, bias=False)
-
+        self.word2vec = np.load(os.path.join(data_dir, 'embeddings_%s_%s.npy'%(embed, dataset_name)),\
+                                allow_pickle=True).item()
         if dataset_name == 'pascal':
             self.classes = ['plane', 'bicycle', 'bird', 'boat',
                             'bottle', 'bus', 'car', 'cat', 'chair',
@@ -327,25 +342,25 @@ class WordEmbedResNet(CoResNet):
 class WordEmbedProtoResNet(CoResNet):
     def __init__(self, block, layers, num_classes, data_dir='./datasets/', embed='word2vec'):
         super(WordEmbedProtoResNet, self).__init__(block, layers, num_classes)
-        
+
         self.word_embedding_type = 'non-linear'
-        
+
         if embed == 'word2vec':
             self.word2vec = np.load(os.path.join(data_dir, 'embeddings.npy'),
                                     allow_pickle=True).item()
-            self.linear_word_embedding = nn.Linear(300, 256, 
+            self.linear_word_embedding = nn.Linear(300, 256,
                                                    bias=self.word_embedding_type=='non-linear')
         elif embed == 'fasttext':
             self.word2vec = np.load(os.path.join(data_dir, 'fsttxt.npy'),
                                     allow_pickle=True).item()
-            self.linear_word_embedding = nn.Linear(300, 256, 
+            self.linear_word_embedding = nn.Linear(300, 256,
                                                    bias=self.word_embedding_type=='non-linear')
         elif embed == 'concat':
             self.word2vec = np.load(os.path.join(data_dir, 'concatenated_embed.npy'),
                                     allow_pickle=True).item()
-            self.linear_word_embedding = nn.Linear(600, 256, 
+            self.linear_word_embedding = nn.Linear(600, 256,
                                                    bias=self.word_embedding_type=='non-linear')
-        
+
         self.classes = ['plane', 'bicycle', 'bird', 'boat',
                         'bottle', 'bus', 'car', 'cat', 'chair',
                         'cow', 'table', 'dog', 'horse',
@@ -355,7 +370,7 @@ class WordEmbedProtoResNet(CoResNet):
         self.reduction_soft_mask = nn.Conv2d(256*2, 1, 1, bias=True)
         self.hidden_mixer = nn.Linear(256, 256, bias=True)
         self.reduction_mixer = nn.Linear(256, 1, bias=True)
-        
+
         self.relu = nn.ReLU(inplace=True)
         self.sigmoid = nn.Sigmoid()
         self.dropout = nn.Dropout(p=0.1, inplace=False)
@@ -389,19 +404,19 @@ class WordEmbedProtoResNet(CoResNet):
         vb_mask = torch.cat((vb, word_embedding_tiled), 1)
         vb_mask = self.reduction_soft_mask(vb_mask)
         vb_mask = self.sigmoid(vb_mask)
-        
+
         feature_size = vb.shape[-2:]
         vb_proto = F.avg_pool2d(vb * vb_mask, kernel_size=feature_size)
         vb_proto = vb_proto.repeat(1, 1, vb.shape[2], vb.shape[3])
-        
+
         mixer = self.hidden_mixer(word_embedding)
         mixer = self.relu(mixer)
         mixer = self.dropout(mixer)
         mixer = self.reduction_mixer(mixer)
         mixer = self.sigmoid(mixer).unsqueeze(2).unsqueeze(2)
-        
+
         mixed_prototype = word_embedding_tiled * mixer + (1.0-mixer) * vb_proto
-        
+
         va = torch.cat((va, mixed_prototype), 1)
         za = self.reduction(va)
         return za

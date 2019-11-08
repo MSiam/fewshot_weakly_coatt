@@ -12,10 +12,11 @@ import glob
 
 class Dataset(object):
     def __init__(self, data_dir, fold, input_size=[321, 321], normalize_mean=[0, 0, 0],
-                 normalize_std=[1, 1, 1], seed=None, split='val'):
+                 normalize_std=[1, 1, 1], seed=None, split='val', n_shots=1):
 
         self.data_dir = data_dir
         self.input_size = input_size
+        self.n_shots = n_shots
 
         self.rand = random.Random()
         self.split = split
@@ -38,14 +39,17 @@ class Dataset(object):
             query_name=self.chosen_data_list[index][0]
             sample_class=self.chosen_data_list[index][1]
             support_img_list = self.binary_pair_list[sample_class]  # all img that contain the sample_class
-            while True:  # random sample a support data
-                support_name = support_img_list[self.rand.randint(0, len(support_img_list) - 1)]
-                if support_name != query_name:
-                    break
-            self.query_class_support_list[index]=[query_name,sample_class,support_name]
+            support_names= []
+            for i in range(0, self.n_shots):
+                while True:
+                    support_name = support_img_list[self.rand.randint(0, len(support_img_list) - 1)]
+                    if support_name != query_name:
+                        break
+                support_names.append(support_name)
+
+            self.query_class_support_list[index]=[query_name,sample_class,support_names]
 
         self.initiaize_transformation(normalize_mean, normalize_std, input_size)
-        pass
 
     def get_new_exist_class_dict(self, fold):
         new_exist_class_list = []
@@ -98,7 +102,7 @@ class Dataset(object):
         # give an query index,sample a target class first
         query_name = self.query_class_support_list[index][0]
         sample_class = self.query_class_support_list[index][1]  # random sample a class in this img
-        support_name=self.query_class_support_list[index][2]
+        support_names = self.query_class_support_list[index][2]
 
         input_size = self.input_size[0]
         # random scale and crop for support only during validation not testing
@@ -117,27 +121,39 @@ class Dataset(object):
             margin_h = self.rand.randint(0, scaled_size - input_size)
             margin_w = self.rand.randint(0, scaled_size - input_size)
 
-        support_rgb = self.normalize(
-            self.ToTensor(
-                scale_transform_rgb(
+        support_rgbs = []
+        support_masks = []
+        support_originals = []
+        for support_name in support_names:
+            support_rgb = self.normalize(
+                self.ToTensor(
+                    scale_transform_rgb(
+                        self.flip(flip_flag,
+                                  Image.open(
+                                      os.path.join(self.data_dir, 'JPEGImages', support_name + '.jpg'))))))
+
+            support_original = np.array(
+                                    scale_transform_rgb(
+                                        Image.open(os.path.join(self.data_dir, 'JPEGImages', support_name + '.jpg'))))
+
+            support_mask = self.ToTensor(
+                scale_transform_mask(
                     self.flip(flip_flag,
                               Image.open(
-                                  os.path.join(self.data_dir, 'JPEGImages', support_name + '.jpg'))))))
+                                  os.path.join(self.data_dir, 'Binary_map_aug', 'val', str(sample_class),
+                                               support_name + '.png')))))
+            if self.split != 'test': # No margins either during testing
+                support_rgb = support_rgb[:, margin_h:margin_h + input_size, margin_w:margin_w + input_size]
+                support_mask = support_mask[:, margin_h:margin_h + input_size, margin_w:margin_w + input_size]
+                support_original = support_original[:, margin_h:margin_h + input_size, margin_w:margin_w + input_size]
 
-        support_original = np.array(
-                                scale_transform_rgb(
-                                    Image.open(os.path.join(self.data_dir, 'JPEGImages', support_name + '.jpg'))))
-        support_mask = self.ToTensor(
-            scale_transform_mask(
-                self.flip(flip_flag,
-                          Image.open(
-                              os.path.join(self.data_dir, 'Binary_map_aug', 'val', str(sample_class),
-                                           support_name + '.png')))))
-        if self.split != 'test': # No margins either during testing
-            support_rgb = support_rgb[:, margin_h:margin_h + input_size, margin_w:margin_w + input_size]
-            support_mask = support_mask[:, margin_h:margin_h + input_size, margin_w:margin_w + input_size]
-            support_original = support_original[margin_h:margin_h + input_size, margin_w:margin_w + input_size, :]
+            support_rgbs.append(support_rgb)
+            support_masks.append(support_mask)
+            support_originals.append(support_original)
 
+        support_rgbs = torch.stack(support_rgbs)
+        support_masks = torch.stack(support_masks)
+        support_originals = np.asarray(support_originals)
 
         # random scale and crop for query
         scaled_size = self.input_size[0]
@@ -175,8 +191,8 @@ class Dataset(object):
         else:
             history_mask=self.history_mask_list[index]
 
-        return query_rgb, query_mask, support_rgb, support_mask, history_mask, \
-                    support_original, qry_original, sample_class,index
+        return query_rgb, query_mask, support_rgbs, support_masks, history_mask, \
+                    support_originals, qry_original, sample_class,index
 
     def flip(self, flag, img):
         if flag > 0.5:

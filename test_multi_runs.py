@@ -11,18 +11,12 @@ from utils import *
 import numpy as np
 import os
 import cv2
-import signal, sys
 from coco import create_coco_fewshot
-
-def signal_handling(signum, frame):
-    test = telegram_bot_sendtext('process aborted')
-    print(test)
-    sys.exit()
 
 def save(save_dir, support_rgb, support_mask, query_rgb, pred, iter_i):
     for i, (srgb, smask, qrgb, p) in \
             enumerate(zip(support_rgb, support_mask, query_rgb, pred)):
-        cv2.imwrite(save_dir+'/sprt/'+'%05d'%(iter_i+i)+'.png', srgb.numpy())
+        cv2.imwrite(save_dir+'/sprt/'+'%05d'%(iter_i+i)+'.png', srgb[0].numpy())
         cv2.imwrite(save_dir+'/qry/'+'%05d'%(iter_i+i)+'.png', qrgb.numpy())
         cv2.imwrite(save_dir+'/sprt_lbl/'+'%05d'%(iter_i+i)+'.png', smask[0].cpu().numpy())
         cv2.imwrite(save_dir+'/qry_pred/'+'%05d'%(iter_i+i)+'.png', p.cpu().numpy())
@@ -44,7 +38,7 @@ def test_multi_runs(options):
 
     #load trained parameter
     checkpoint_dir = os.path.join(options.exp_dir, options.ckpt, 'fo=%d'% options.fold)
-    logger = open(os.path.join(checkpoint_dir, 'final_test_miou.txt'), 'w')
+    logger = open(os.path.join(checkpoint_dir, 'final_test_miou_%d.txt'%options.n_shots), 'w')
     model=nn.DataParallel(model,[0])
     model.load_state_dict(torch.load(os.path.join(checkpoint_dir, 'model/best.pth')))
 
@@ -74,13 +68,13 @@ def test_multi_runs(options):
             seed = options.seed + eva_iter
             if options.dataset_name == 'pascal':
                 inferset = Dataset_val(data_dir=data_dir, fold=options.fold, input_size=input_size, normalize_mean=IMG_MEAN,
-                                         normalize_std=IMG_STD, seed=seed, split='test')
+                                         normalize_std=IMG_STD, seed=seed, split='test', n_shots=options.n_shots)
             else:
                 inferset, cat_ids = create_coco_fewshot(data_dir, 'test', input_size=input_size,
                                               n_ways=1, n_shots=1, max_iters=1000, fold=options.fold,
                                               prob=options.prob, seed=seed)
 
-            valloader = data.DataLoader(inferset, batch_size=options.bs, shuffle=False, num_workers=0,
+            valloader = data.DataLoader(inferset, batch_size=options.bs, shuffle=False, num_workers=options.num_workers,
                                         drop_last=False)
 
 
@@ -89,7 +83,6 @@ def test_multi_runs(options):
             all_inter, all_union, all_predict = [0] * nfold_classes, [0] * nfold_classes, [0] * nfold_classes
             all_fgbg_iou = []
 
-            signal.signal(signal.SIGINT, signal_handling)
             for i_iter, batch in enumerate(valloader):
                 print('Iteration ', i_iter)
                 query_rgb, query_mask, support_rgb, support_mask, history_mask, sprt_original, qry_original, \
@@ -157,7 +150,3 @@ def test_multi_runs(options):
 
         logger.write('IOU:%.4f , FgBg IOU:%.4f\n' % (mean_iou, fgbg_mean_iou))
         logger.close()
-        test = telegram_bot_sendtext('Exp %s fold %0.1f film %d IOU%.4f FGBG IOU%.4f' % (options.model_type.replace('_', ''), \
-                                                                                         options.fold, options.film, mean_iou, \
-                                                                                         fgbg_mean_iou))
-        print(test)

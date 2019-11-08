@@ -39,14 +39,12 @@ def optim_or_not(model, yes):
             param.requires_grad = False
 
 
-def turn_off(model):
+def turn_off(model, filmed):
     optim_or_not(model.module.conv1, False)
     optim_or_not(model.module.layer1, False)
     optim_or_not(model.module.layer2, False)
-    optim_or_not(model.module.layer3, False)
-
-
-
+    if not filmed:
+        optim_or_not(model.module.layer3, False)
 
 def get_10x_lr_params(model, model_type, filmed):
     """

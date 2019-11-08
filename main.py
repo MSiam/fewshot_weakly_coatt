@@ -124,10 +124,19 @@ parser.add_argument('-test_multi_run',
                     type=int,
                     default=0)
 
+parser.add_argument('-n_shots',
+                    type=int,
+                    default=1)
+
 parser.add_argument('-dataset_name',
                     type=str,
                     default='pascal',
                     help='Name of dataset: pascal/coco')
+
+parser.add_argument('-num_workers',
+                    type=int,
+                    default=1,
+                    help='num workers')
 
 def main(argv=None):
     options = parser.parse_args()

@@ -71,7 +71,7 @@ def meta_train(options):
     model=nn.DataParallel(model,[0])
 
     # disable the  gradients of not optomized layers
-    turn_off(model)
+    turn_off(model, filmed=options.film)
 
     checkpoint_dir = os.path.join(options.exp_dir, options.ckpt, 'fo=%d'% options.fold)
     check_dir(checkpoint_dir)
@@ -80,13 +80,13 @@ def meta_train(options):
     # trainset
     if options.dataset_name == 'pascal':
         dataset = Dataset_train(data_dir=data_dir, fold=options.fold, input_size=input_size, normalize_mean=IMG_MEAN,
-                                normalize_std=IMG_STD, prob=options.prob, seed=options.seed)
+                                normalize_std=IMG_STD, prob=options.prob, seed=options.seed, n_shots=options.n_shots)
     else:
         dataset, cat_ids = create_coco_fewshot(data_dir, 'train', input_size=input_size,
                                       n_ways=1, n_shots=1, max_iters=30000, fold=options.fold,
                                       prob=options.prob, seed=options.seed)
 
-    trainloader = data.DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=1)
+    trainloader = data.DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=options.num_workers)
     save_pred_every = len(trainloader) - 1
 
     optimizer = optim.SGD([{'params': get_10x_lr_params(model, options.model_type, options.film),
@@ -192,7 +192,7 @@ def meta_train(options):
                                                  prob=options.prob, seed=initial_seed+eva_iter)
 
                 valset.history_mask_list=[None] * 1000
-                valloader = data.DataLoader(valset, batch_size=options.bs_val, shuffle=False, num_workers=1,
+                valloader = data.DataLoader(valset, batch_size=options.bs_val, shuffle=False, num_workers=options.num_workers,
                                             drop_last=False)
 
                 all_inter, all_union, all_predict = [0] * nfold_out_classes, [0] * nfold_out_classes, [0] * nfold_out_classes
@@ -200,8 +200,8 @@ def meta_train(options):
                     print('Eva Iter ', i_iter)
                     query_rgb, query_mask, support_rgb, support_mask, history_mask, _, _, sample_class, index = batch
                     query_rgb = (query_rgb).cuda(0)
-                    support_rgb = (support_rgb).cuda(0)
-                    support_mask = (support_mask).cuda(0)
+                    support_rgb = (support_rgb[0]).cuda(0)
+                    support_mask = (support_mask[0]).cuda(0)
                     query_mask = (query_mask).cuda(0).long()  # change formation for crossentropy use
 
                     query_mask = query_mask[:, 0, :, :]  # remove the second dim,change formation for crossentropy use
