@@ -145,7 +145,7 @@ class Dataset(object):
             if self.split != 'test': # No margins either during testing
                 support_rgb = support_rgb[:, margin_h:margin_h + input_size, margin_w:margin_w + input_size]
                 support_mask = support_mask[:, margin_h:margin_h + input_size, margin_w:margin_w + input_size]
-                support_original = support_original[:, margin_h:margin_h + input_size, margin_w:margin_w + input_size]
+                support_original = support_original[margin_h:margin_h + input_size, margin_w:margin_w + input_size, :]
 
             support_rgbs.append(support_rgb)
             support_masks.append(support_mask)

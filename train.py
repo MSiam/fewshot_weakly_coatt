@@ -200,8 +200,8 @@ def meta_train(options):
                     print('Eva Iter ', i_iter)
                     query_rgb, query_mask, support_rgb, support_mask, history_mask, _, _, sample_class, index = batch
                     query_rgb = (query_rgb).cuda(0)
-                    support_rgb = (support_rgb[0]).cuda(0)
-                    support_mask = (support_mask[0]).cuda(0)
+                    support_rgb = (support_rgb).cuda(0)
+                    support_mask = (support_mask).cuda(0)
                     query_mask = (query_mask).cuda(0).long()  # change formation for crossentropy use
 
                     query_mask = query_mask[:, 0, :, :]  # remove the second dim,change formation for crossentropy use
