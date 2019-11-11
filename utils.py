@@ -4,9 +4,9 @@ import torch
 from pylab import plt
 
 
-def load_resnet50_param(model, stop_layer='layer4'):
-    resnet50 = torchvision.models.resnet50(pretrained=True)
-    saved_state_dict = resnet50.state_dict()
+def load_resnet101_param(model, stop_layer='layer4'):
+    resnet101 = torchvision.models.resnet101(pretrained=True)
+    saved_state_dict = resnet101.state_dict()
     new_params = model.state_dict().copy()
 
     for i in saved_state_dict:  # copy params from resnet50,except layers after stop_layer
