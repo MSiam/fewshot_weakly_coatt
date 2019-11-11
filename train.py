@@ -20,7 +20,7 @@ from torch.optim.lr_scheduler import StepLR
 from common.torch_utils import SnapshotManager
 from tensorboardX import SummaryWriter
 from coco import create_coco_fewshot
-from test_oslsm_setup import test
+from test_multi_runs import test_multi_runs
 
 def meta_train(options):
     data_dir = options.data_dir
@@ -213,7 +213,7 @@ def meta_train(options):
                     if options.model_type == 'vanilla':
                         pred = model(query_rgb, support_rgb, support_mask,history_mask)
                     else:
-                        pred = model(query_rgb, support_rgb, sample_class,history_mask)
+                        pred, _ = model(query_rgb, support_rgb, sample_class,history_mask)
                     pred_softmax = F.softmax(pred, dim=1).data.cpu()
 
                     # update history mask
@@ -275,7 +275,7 @@ def meta_train(options):
         tensorboard.add_scalar('training/loss', training_loss, epoch)
         tensorboard.add_scalar('training/learning_rate', scheduler.get_lr(), epoch)
 
-        test_miou = test(options, mode='last')
+        test_miou = test_multi_runs(options, mode='last')
         tensorboard.add_scalar('test/mean_iou', test_miou, epoch)
 
         scheduler.step()

@@ -98,7 +98,7 @@ def test_multi_runs(options):
                 if options.model_type == 'vanilla':
                     pred = model(query_rgb, support_rgb, support_mask,history_mask)
                 else:
-                    pred=model(query_rgb, support_rgb, sample_class,history_mask)
+                    pred, _ = model(query_rgb, support_rgb, sample_class,history_mask)
 
                 pred_softmax = F.softmax(pred, dim=1).data.cpu()
 
