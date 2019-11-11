@@ -21,7 +21,7 @@ def save(save_dir, support_rgb, support_mask, query_rgb, pred, iter_i):
         cv2.imwrite(save_dir+'/sprt_lbl/'+'%05d'%(iter_i+i)+'.png', smask[0].cpu().numpy())
         cv2.imwrite(save_dir+'/qry_pred/'+'%05d'%(iter_i+i)+'.png', p.cpu().numpy())
 
-def test_multi_runs(options):
+def test_multi_runs(options, mode='best'):
     data_dir = options.data_dir
     torch.backends.cudnn.benchmark = True
 
@@ -40,7 +40,13 @@ def test_multi_runs(options):
     checkpoint_dir = os.path.join(options.exp_dir, options.ckpt, 'fo=%d'% options.fold)
     logger = open(os.path.join(checkpoint_dir, 'final_test_miou_%d.txt'%options.n_shots), 'w')
     model=nn.DataParallel(model,[0])
-    model.load_state_dict(torch.load(os.path.join(checkpoint_dir, 'model/best.pth')))
+    if mode == 'best':
+        model.load_state_dict(torch.load(os.path.join(checkpoint_dir, 'model/best.pth')))
+    elif mode == 'last':
+        snapshot_manager = SnapshotManager(snapshot_dir=os.path.join(checkpoint_dir, 'snapshot'),
+                                           logging_frequency=1, snapshot_frequency=1)
+        last_epoch = snapshot_manager.restore(model, optimizer=None)
+        print(f'Restored epoch {last_epoch}')
 
     if options.save_vis != '' and not os.path.exists(options.save_vis):
         os.mkdir(options.save_vis)
