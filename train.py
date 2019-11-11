@@ -147,10 +147,11 @@ def meta_train(options):
 
             optimizer.zero_grad()
             if options.model_type == 'vanilla':
-                pred=model(query_rgb, support_rgb, support_mask,history_mask)
+                pred = model(query_rgb, support_rgb, support_mask,history_mask)
             else:
-                pred=model(query_rgb, support_rgb, sample_class,history_mask)
+                pred, pred_sprt = model(query_rgb, support_rgb, sample_class,history_mask)
             pred_softmax=F.softmax(pred,dim=1).data.cpu()
+            pred_sprt_softmax=F.softmax(pred_sprt,dim=1).data.cpu()
 
             #update history mask
             for j in range (support_mask.shape[0]):
@@ -158,8 +159,10 @@ def meta_train(options):
                 dataset.history_mask_list[sub_index]=pred_softmax[j]
 
             pred = nn.functional.interpolate(pred,size=input_size, mode='bilinear',align_corners=True)#upsample
+            pred_sprt = nn.functional.interpolate(pred_sprt,size=input_size, mode='bilinear',align_corners=True)#upsample
 
             loss = loss_calc_v1(pred, query_mask, 0)
+            loss += loss_calc_v1(pred_sprt, support_mask[:,0,0,...], 0)
             loss.backward()
             optimizer.step()
 

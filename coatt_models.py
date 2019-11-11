@@ -193,16 +193,52 @@ class WordEmbedCoResNet(CoResNet):
         exemplar_corr = self.linear_e(exemplar_t)
         S = torch.bmm(exemplar_corr, query_flat)
         Sc = F.softmax(S, dim = 1) #
+        Sr = F.softmax(torch.transpose(S, 1, 2), dim = 1) #
 
-        za = torch.bmm(exemplar_flat, Sc).contiguous()
-        za = za.view(-1, channel, fea_size[0], fea_size[1])
+        uq = torch.bmm(exemplar_flat, Sc).contiguous()
+        uq = uq.view(-1, channel, fea_size[0], fea_size[1])
 
-        input2_mask = self.gate(za)
+        us = torch.bmm(query_flat, Sr).contiguous()
+        us = us.view(-1, channel, fea_size[0], fea_size[1])
+
+        input2_mask = self.gate(uq)
         input2_mask = self.gate_s(input2_mask)
 
-        za = za * input2_mask
-        za = self.reduction(za)
-        return za
+        input1_mask = self.gate(us)
+        input1_mask = self.gate_s(input1_mask)
+
+        uq = uq * input2_mask
+        us = us * input1_mask
+
+        uq = self.reduction(uq)
+        us = self.reduction(us)
+
+        return uq, us
+
+    def decode(self, att_summaries, visual_feats, size, history_mask,
+               feature_size):
+
+        att_summaries = att_summaries.view(size[0], size[1],
+                                           att_summaries.shape[1],
+                                           att_summaries.shape[2],
+                                           att_summaries.shape[3])
+
+        att_summaries = torch.mean(att_summaries, dim=1)
+        out = torch.cat([visual_feats, att_summaries],dim=1)
+        out = self.layer55(out)
+        if history_mask is not None:
+            out_plus_history = torch.cat([out,history_mask],dim=1)
+            out = out + self.residule1(out_plus_history)
+            out = out + self.residule2(out)
+            out = out + self.residule3(out)
+
+        global_feature=F.avg_pool2d(out,kernel_size=feature_size)
+        global_feature=self.layer6_0(global_feature)
+        global_feature=global_feature.expand(-1,-1,feature_size[0],feature_size[1])
+        out=torch.cat([global_feature,self.layer6_1(out),self.layer6_2(out),self.layer6_3(out),self.layer6_4(out)],dim=1)
+        out=self.layer7(out)
+        out=self.layer9(out)
+        return out
 
     def forward(self, query_rgb, support_rgb, support_lbl, history_mask):
         nwe = self.extract_nwe(support_lbl)
@@ -266,27 +302,12 @@ class WordEmbedCoResNet(CoResNet):
             z = self.filmed_coattend(query_rgb_rep, support_rgb, gammas_256,
                                      betas_256)
         else:
-            z = self.coattend(query_rgb_rep, support_rgb, nwe_rep)
+            zq, zs = self.coattend(query_rgb_rep, support_rgb, nwe_rep)
 
         history_mask=F.interpolate(history_mask,feature_size,mode='bilinear',align_corners=True)
-        z = z.view(srgb_size[0], srgb_size[1], z.shape[1], z.shape[2], z.shape[3])
-        z = torch.mean(z, dim=1)
-
-        out=torch.cat([query_rgb,z],dim=1)
-        out = self.layer55(out)
-        out_plus_history=torch.cat([out,history_mask],dim=1)
-        out = out + self.residule1(out_plus_history)
-        out = out + self.residule2(out)
-        out = out + self.residule3(out)
-
-        global_feature=F.avg_pool2d(out,kernel_size=feature_size)
-        global_feature=self.layer6_0(global_feature)
-        global_feature=global_feature.expand(-1,-1,feature_size[0],feature_size[1])
-        out=torch.cat([global_feature,self.layer6_1(out),self.layer6_2(out),self.layer6_3(out),self.layer6_4(out)],dim=1)
-        out=self.layer7(out)
-
-        out=self.layer9(out)
-        return out
+        outq = self.decode(zq, query_rgb, srgb_size, history_mask, feature_size)
+        outs = self.decode(zs, support_rgb, srgb_size, None, feature_size)
+        return outq, outs
 
 class WordEmbedResNet(CoResNet):
     def __init__(self, block, layers, num_classes, data_dir='./datasets/', embed='word2vec', dataset_name='pascal'):
