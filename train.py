@@ -67,7 +67,7 @@ def meta_train(options):
                         filmed=options.film, embed=options.embed_type, dataset_name=options.dataset_name)
 
     # load resnet-50 preatrained parameter
-    model = load_resnet50_param(model, stop_layer='layer4')
+    model = load_resnet101_param(model, stop_layer='layer4')
     model=nn.DataParallel(model,[0])
 
     # disable the  gradients of not optomized layers
