@@ -157,3 +157,4 @@ def test_multi_runs(options, mode='best'):
 
         logger.write('IOU:%.4f , FgBg IOU:%.4f\n' % (mean_iou, fgbg_mean_iou))
         logger.close()
+        return mean_iou
