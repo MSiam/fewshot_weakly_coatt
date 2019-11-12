@@ -66,7 +66,7 @@ class IterativeWordEmbedCoResNet(WordEmbedCoResNet):
         uq = self.reduction(uq)
         us = self.reduction(us)
 
-        return uq, us
+        return uq, us, input2_mask, input1_mask
 
     def forward(self, query_rgb, support_rgb, support_lbl, history_mask):
         srgb_size = support_rgb.shape
@@ -104,12 +104,15 @@ class IterativeWordEmbedCoResNet(WordEmbedCoResNet):
         sqry_size = query_rgb_rep.shape
         query_rgb_rep = query_rgb_rep.view(-1, sqry_size[2], sqry_size[3], sqry_size[4])
 
-        va1, vb1 = self.coattend(query_rgb_rep, support_rgb, support_lbl, srgb_size)
+        va1, vb1, maskq, masks = self.coattend(query_rgb_rep, support_rgb, support_lbl, srgb_size)
+        self.attention_masks = []
+        self.attention_masks.append((maskq, masks))
 
         va1 = self.relu(self.reduction_cat(torch.cat([query_rgb_rep, va1], dim=1)))
         vb1 = self.relu(self.reduction_cat(torch.cat([support_rgb, vb1], dim=1)))
 
-        va2, _ = self.coattend(va1, vb1, support_lbl, srgb_size)
+        va2, _, maskq, masks = self.coattend(va1, vb1, support_lbl, srgb_size)
+        self.attention_masks.append((maskq, masks))
         z = va1 + va2
 
 #        va2, vb2 = self.coattend(va1, vb1, support_lbl)

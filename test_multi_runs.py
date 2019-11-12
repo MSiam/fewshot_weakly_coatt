@@ -14,13 +14,15 @@ import cv2
 from coco import create_coco_fewshot
 from common.torch_utils import SnapshotManager
 
-def save(save_dir, support_rgb, support_mask, query_rgb, pred, iter_i):
-    for i, (srgb, smask, qrgb, p) in \
-            enumerate(zip(support_rgb, support_mask, query_rgb, pred)):
-        cv2.imwrite(save_dir+'/sprt/'+'%05d'%(iter_i+i)+'.png', srgb[0].numpy())
-        cv2.imwrite(save_dir+'/qry/'+'%05d'%(iter_i+i)+'.png', qrgb.numpy())
-        cv2.imwrite(save_dir+'/sprt_lbl/'+'%05d'%(iter_i+i)+'.png', smask[0].cpu().numpy())
-        cv2.imwrite(save_dir+'/qry_pred/'+'%05d'%(iter_i+i)+'.png', p.cpu().numpy())
+def save(save_dir, support_rgb, support_mask, query_rgb, pred, att_mask_qry, iter_i):
+    for i, (srgb, smask, qrgb, att_qry, p) in \
+            enumerate(zip(support_rgb, support_mask, query_rgb, att_mask_qry, pred)):
+
+            cv2.imwrite(save_dir+'/sprt/'+'%05d'%(iter_i+i)+'.png', srgb[0].numpy()[:,:,::-1])
+            cv2.imwrite(save_dir+'/qry/'+'%05d'%(iter_i+i)+'.png', qrgb.numpy()[:,:,::-1])
+            cv2.imwrite(save_dir+'/sprt_lbl/'+'%05d'%(iter_i+i)+'.png', smask[0,0].cpu().numpy())
+            cv2.imwrite(save_dir+'/qry_pred/'+'%05d'%(iter_i+i)+'.png', p.cpu().numpy())
+            plt.imshow(att_qry[0]);plt.axis('off');plt.savefig(save_dir+'att_mask/%05d.png'%(iter_i+i), bbox_inches='tight')
 
 def test_multi_runs(options, mode='best'):
     data_dir = options.data_dir
@@ -55,6 +57,7 @@ def test_multi_runs(options, mode='best'):
         os.mkdir(options.save_vis+'qry')
         os.mkdir(options.save_vis+'qry_pred')
         os.mkdir(options.save_vis+'sprt_lbl')
+        os.mkdir(options.save_vis+'att_mask')
 
     if options.dataset_name == 'pascal':
         nfold_classes = 5
@@ -71,7 +74,7 @@ def test_multi_runs(options, mode='best'):
         initial_seed = options.seed
         eva_iters_means = []
         eva_iters_fgbg_means = []
-        for eva_iter in range(5):
+        for eva_iter in range(options.iter_time):
             seed = options.seed + eva_iter
             if options.dataset_name == 'pascal':
                 inferset = Dataset_val(data_dir=data_dir, fold=options.fold, input_size=input_size, normalize_mean=IMG_MEAN,
@@ -109,6 +112,10 @@ def test_multi_runs(options, mode='best'):
 
                 pred_softmax = F.softmax(pred, dim=1).data.cpu()
 
+                pred = nn.functional.interpolate(pred, size=input_size, mode='bilinear',
+                                                     align_corners=True)  #upsample  # upsample
+                mask_q1 = nn.functional.interpolate(model.module.attention_masks[0][0], size=input_size,
+                                                  mode='bilinear',align_corners=True)
                 # update history mask
                 for j in range(support_mask.shape[0]):
                     sub_index = index[j]
@@ -120,7 +127,7 @@ def test_multi_runs(options, mode='best'):
                 _, pred_label = torch.max(pred, 1)
                 if options.save_vis != '' and eva_iter == 0:
                     save(options.save_vis, sprt_original, support_mask, qry_original,
-                        pred_label, i_iter*options.bs)
+                        pred_label, mask_q1, i_iter*options.bs)
 
                 inter_list, union_list, _, num_predict_list = get_iou_v1(query_mask, pred_label)
                 inter_list_bg, union_list_bg, _, num_predict_list = get_iou_v1(query_mask, pred_label,
