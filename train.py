@@ -27,7 +27,7 @@ def meta_train(options):
 
     cudnn.enabled = True
     torch.backends.cudnn.benchmark = True
-    torch.backends.cudnn.deterministic = True
+#    torch.backends.cudnn.deterministic = True
 
     torch.manual_seed(options.seed)
     torch.cuda.manual_seed(options.seed)
