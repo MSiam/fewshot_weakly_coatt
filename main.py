@@ -6,6 +6,9 @@ from train import meta_train
 from test_oslsm_setup import test
 from test_multi_runs import test_multi_runs
 from common.gen_experiments import load_and_save_params, Namespace
+import torch
+import numpy
+import random
 
 parser = argparse.ArgumentParser()
 
@@ -93,6 +96,10 @@ parser.add_argument('-resume',
                     type=int,
                     help='epoch to resume from if 0 doesnt resume',
                     default=0)
+parser.add_argument('-reproducability',
+                    type=int,
+                    help='flag to ensure reproducability of the results but slower training',
+                    default=0)
 
 parser.add_argument('-train',
                     type=int,
@@ -143,7 +150,19 @@ def main(argv=None):
     if options.split not in ['trainval', 'val', 'test']:
         print('Error in split')
 
-#    options = Namespace(load_and_save_params(vars(options), options.exp_dir))
+    options = Namespace(load_and_save_params(vars(options), options.exp_dir))
+    if options.reproducability:
+        torch.backends.cudnn.benchmark = False
+        torch.backends.cudnn.deterministic = True
+    else:
+        torch.backends.cudnn.enabled = True
+        torch.backends.cudnn.benchmark = True
+
+    torch.manual_seed(options.seed)
+    torch.cuda.manual_seed(options.seed)
+    numpy.random.seed(options.seed)
+    random.seed(options.seed)
+
     if options.train:
         meta_train(options)
 

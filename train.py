@@ -25,20 +25,6 @@ from test_multi_runs import test_multi_runs
 def meta_train(options):
     data_dir = options.data_dir
 
-    cudnn.enabled = True
-    torch.backends.cudnn.benchmark = True
-    torch.backends.cudnn.deterministic = True
-
-    torch.manual_seed(options.seed)
-    torch.cuda.manual_seed(options.seed)
-    np.random.seed(options.seed)
-    random.seed(options.seed)
-
-    torch.manual_seed(options.seed)
-    torch.cuda.manual_seed(options.seed)
-    np.random.seed(options.seed)
-    random.seed(options.seed)
-
     #set gpus
     gpu_list = [int(x) for x in options.gpu.split(',')]
     os.environ['CUDA_DEVICE_ORDER'] = 'PCI_BUS_ID'
@@ -54,7 +40,6 @@ def meta_train(options):
     batch_size = options.bs
     weight_decay = 0.0005
     momentum = 0.9
-    power = 0.9
     if options.dataset_name == 'pascal':
         nfold_classes = 5
         nfold_out_classes = 15
