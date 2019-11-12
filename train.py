@@ -1,6 +1,5 @@
 from torch.utils import data
 import torch.optim as optim
-import torch.backends.cudnn as cudnn
 import os.path as osp
 from utils import *
 import time
@@ -25,20 +24,6 @@ from test_multi_runs import test_multi_runs
 def meta_train(options):
     data_dir = options.data_dir
 
-    cudnn.enabled = True
-    torch.backends.cudnn.benchmark = True
-#    torch.backends.cudnn.deterministic = True
-
-    torch.manual_seed(options.seed)
-    torch.cuda.manual_seed(options.seed)
-    np.random.seed(options.seed)
-    random.seed(options.seed)
-
-    torch.manual_seed(options.seed)
-    torch.cuda.manual_seed(options.seed)
-    np.random.seed(options.seed)
-    random.seed(options.seed)
-
     #set gpus
     gpu_list = [int(x) for x in options.gpu.split(',')]
     os.environ['CUDA_DEVICE_ORDER'] = 'PCI_BUS_ID'
@@ -54,7 +39,6 @@ def meta_train(options):
     batch_size = options.bs
     weight_decay = 0.0005
     momentum = 0.9
-    power = 0.9
     if options.dataset_name == 'pascal':
         nfold_classes = 5
         nfold_out_classes = 15
@@ -89,6 +73,7 @@ def meta_train(options):
     trainloader = data.DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=options.num_workers)
     save_pred_every = len(trainloader) - 1
 
+    # create optimizer
     optimizer = optim.SGD([{'params': get_10x_lr_params(model, options.model_type, options.film),
                         'lr': 10 * learning_rate}],
                         lr=learning_rate, momentum=momentum, weight_decay=weight_decay)
@@ -122,18 +107,21 @@ def meta_train(options):
         iou_list = list(snapshot_manager.losses['validation'].values())
         highest_iou = np.max(iou_list)
 
-    tensorboard = SummaryWriter(log_dir = os.path.join(checkpoint_dir, 'tensorboard'))
     model.cuda()
-    tempory_loss = 0  # accumulated loss
     model = model.train()
+
+    # initialize vars for summaries and logging
+    tensorboard = SummaryWriter(log_dir = os.path.join(checkpoint_dir, 'tensorboard'))
+    tempory_loss = 0  # accumulated loss
     best_epoch=0
     snapshot_manager.enable_time_tracking()
+
     for epoch in range(last_epoch+1, num_epoch):
         print('Running epoch ', epoch, ' from ', num_epoch)
         print('Epoch:', epoch,'LR:', scheduler.get_lr())
         begin_time = time.time()
         tqdm_gen = tqdm.tqdm(trainloader)
-
+        floss = open('loss_epoch.txt', 'w')
         for i_iter, batch in enumerate(tqdm_gen):
             query_rgb, query_mask,support_rgb, support_mask,history_mask, _, _, sample_class,index= batch
 
@@ -143,7 +131,6 @@ def meta_train(options):
             query_mask = (query_mask).cuda(0).long()  # change formation for crossentropy use
             query_mask = query_mask[:, 0, :, :]  # remove the second dim,change formation for crossentropy use
             history_mask=(history_mask).cuda(0)
-
 
             optimizer.zero_grad()
             if options.model_type == 'vanilla':
@@ -161,11 +148,11 @@ def meta_train(options):
 
             loss = loss_calc_v1(pred, query_mask, 0)
             loss.backward()
+            floss.write('iter %01d loss %0.6f\n'%(i_iter, loss))
             optimizer.step()
 
             tqdm_gen.set_description('e:%d loss = %.4f-:%.4f' % (
             epoch, loss.item(),highest_iou))
-
 
             #save training loss
             tempory_loss += loss.item()
@@ -174,7 +161,7 @@ def meta_train(options):
                 plot_loss(checkpoint_dir, loss_list, save_pred_every)
                 np.savetxt(os.path.join(checkpoint_dir, 'loss_history.txt'), np.array(loss_list))
                 tempory_loss = 0
-
+        floss.close()
         # ======================evaluate now==================
         with torch.no_grad():
             print ('----Evaluation----')
@@ -184,15 +171,17 @@ def meta_train(options):
             initial_seed = options.seed #+ epoch
             for eva_iter in range(options.iter_time):
                 if options.dataset_name == 'pascal':
-                    valset = Dataset_val(data_dir=data_dir, fold=options.fold, input_size=input_size, normalize_mean=IMG_MEAN,
-                                         normalize_std=IMG_STD, split=options.split, seed=initial_seed+eva_iter)
+                    valset = Dataset_val(data_dir=data_dir, fold=options.fold, input_size=input_size,
+                                         normalize_mean=IMG_MEAN, normalize_std=IMG_STD,
+                                         split=options.split, seed=initial_seed+eva_iter)
                 else:
                     valset, _ = create_coco_fewshot(data_dir, 'trainval', input_size=input_size,
                                                  n_ways=1, n_shots=1, max_iters=1000, fold=options.fold,
                                                  prob=options.prob, seed=initial_seed+eva_iter)
 
                 valset.history_mask_list=[None] * 1000
-                valloader = data.DataLoader(valset, batch_size=options.bs_val, shuffle=False, num_workers=options.num_workers,
+                valloader = data.DataLoader(valset, batch_size=options.bs_val, shuffle=False,
+                                            num_workers=options.num_workers,
                                             drop_last=False)
 
                 all_inter, all_union, all_predict = [0] * nfold_out_classes, [0] * nfold_out_classes, [0] * nfold_out_classes
