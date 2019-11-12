@@ -13,6 +13,7 @@ import os
 import cv2
 from coco import create_coco_fewshot
 from common.torch_utils import SnapshotManager
+import random
 
 def save(save_dir, support_rgb, support_mask, query_rgb, pred, att_mask_qry, iter_i):
     for i, (srgb, smask, qrgb, att_qry, p) in \
@@ -26,7 +27,6 @@ def save(save_dir, support_rgb, support_mask, query_rgb, pred, att_mask_qry, ite
 
 def test_multi_runs(options, mode='best'):
     data_dir = options.data_dir
-    torch.backends.cudnn.benchmark = True
 
     IMG_MEAN = [0.485, 0.456, 0.406]
     IMG_STD = [0.229, 0.224, 0.225]
@@ -34,7 +34,6 @@ def test_multi_runs(options, mode='best'):
     input_size = (500, 500)
     batch_size = options.bs
 
-    cudnn.enabled = True
     # Create network.
     model = Res_Deeplab(data_dir=data_dir, num_classes=num_class, model_type=options.model_type,
                         filmed=options.film, embed=options.embed_type, dataset_name=options.dataset_name)

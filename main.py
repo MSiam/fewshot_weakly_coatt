@@ -6,6 +6,9 @@ from train import meta_train
 from test_oslsm_setup import test
 from test_multi_runs import test_multi_runs
 from common.gen_experiments import load_and_save_params, Namespace
+import torch
+import random
+import numpy
 
 parser = argparse.ArgumentParser()
 
@@ -110,6 +113,12 @@ parser.add_argument('-step_steplr',
                     help='step in step LR scheduler',
                     default=50)
 
+parser.add_argument('-reproducability',
+                    type=int,
+                    help='flag to ensure reproducability of the results but slower training',
+                    default=0)
+
+
 parser.add_argument('-num_epoch',
                     type=int,
                     help='Number of epochs to train',
@@ -144,6 +153,20 @@ def main(argv=None):
         print('Error in split')
 
     options = Namespace(load_and_save_params(vars(options), options.exp_dir))
+
+    # To ensure reproducability
+    if options.reproducability:
+        torch.backends.cudnn.benchmark = False
+        torch.backends.cudnn.deterministic = True
+    else:
+        torch.backends.cudnn.enabled = True
+        torch.backends.cudnn.benchmark = True
+
+    torch.manual_seed(options.seed)
+    torch.cuda.manual_seed(options.seed)
+    numpy.random.seed(options.seed)
+    random.seed(options.seed)
+
     if options.train:
         meta_train(options)
 
