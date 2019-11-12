@@ -12,6 +12,7 @@ import numpy as np
 import os
 import cv2
 from coco import create_coco_fewshot
+from common.torch_utils import SnapshotManager
 
 def save(save_dir, support_rgb, support_mask, query_rgb, pred, iter_i):
     for i, (srgb, smask, qrgb, p) in \
@@ -104,9 +105,10 @@ def test_multi_runs(options, mode='best'):
                 if options.model_type == 'vanilla':
                     pred = model(query_rgb, support_rgb, support_mask,history_mask)
                 else:
-                    pred, _ = model(query_rgb, support_rgb, sample_class,history_mask)
+                    pred, pred_sprt = model(query_rgb, support_rgb, sample_class,history_mask)
 
                 pred_softmax = F.softmax(pred, dim=1).data.cpu()
+                pred_sprt_softmax = F.softmax(pred_sprt, dim=1).data.cpu()
 
                 # update history mask
                 for j in range(support_mask.shape[0]):
@@ -115,6 +117,10 @@ def test_multi_runs(options, mode='best'):
 
                 pred = nn.functional.interpolate(pred, size=input_size, mode='bilinear',
                                                      align_corners=True)  #upsample  # upsample
+                pred_sprt = nn.functional.interpolate(pred_sprt, size=input_size, mode='bilinear',
+                                                     align_corners=True)  #upsample  # upsample
+#                plt.figure(1);plt.imshow(pred_softmax.detach().cpu()[0,1]);plt.figure(2);plt.imshow(query_mask[0].cpu());
+#                plt.figure(3);plt.imshow(pred_sprt_softmax.detach().cpu()[0,1]);plt.figure(4);plt.imshow(support_mask[0,0,0].cpu());plt.show()
 
                 _, pred_label = torch.max(pred, 1)
                 if options.save_vis != '' and eva_iter == 0:
@@ -156,3 +162,4 @@ def test_multi_runs(options, mode='best'):
 
         logger.write('IOU:%.4f , FgBg IOU:%.4f\n' % (mean_iou, fgbg_mean_iou))
         logger.close()
+        return mean_iou
