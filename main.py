@@ -152,6 +152,11 @@ parser.add_argument('-num_workers',
                     default=1,
                     help='num workers')
 
+parser.add_argument('-ftune_backbone',
+                    type=int,
+                    default=0,
+                    help='option to finetune the backbone or not')
+
 def main(argv=None):
     options = parser.parse_args()
     if options.split not in ['trainval', 'val', 'test']:

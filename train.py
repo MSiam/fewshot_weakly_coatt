@@ -56,7 +56,8 @@ def meta_train(options):
     model=nn.DataParallel(model,[0])
 
     # disable the  gradients of not optomized layers
-    turn_off(model, filmed=options.film)
+    if not options.ftune_backbone:
+        turn_off(model, filmed=options.film)
 
     checkpoint_dir = os.path.join(options.exp_dir, options.ckpt, 'fo=%d'% options.fold)
     check_dir(checkpoint_dir)
@@ -75,9 +76,9 @@ def meta_train(options):
     save_pred_every = len(trainloader) - 1
 
     # create optimizer
-    optimizer = optim.SGD([{'params': get_10x_lr_params(model, options.model_type, options.film),
-                        'lr': 10 * learning_rate}],
-                        lr=learning_rate, momentum=momentum, weight_decay=weight_decay)
+    optimizer = optim.SGD([{'params': get_10x_lr_params(model, options.model_type, options.film, options.ftune_backbone),
+                            'lr': 10 * learning_rate}],
+                            lr=learning_rate, momentum=momentum, weight_decay=weight_decay)
     snapshot_manager = SnapshotManager(snapshot_dir=os.path.join(checkpoint_dir, 'snapshot'),
                                        logging_frequency=1, snapshot_frequency=1)
     last_epoch = snapshot_manager.restore(model, optimizer)
