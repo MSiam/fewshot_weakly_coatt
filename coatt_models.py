@@ -288,6 +288,63 @@ class WordEmbedCoResNet(CoResNet):
         out=self.layer9(out)
         return out
 
+class VisualWordEmbedResNet(CoResNet):
+    def __init__(self, block, layers, num_classes, data_dir='./datasets/', embed='word2vec', dataset_name='pascal'):
+        super(VisualWordEmbedResNet, self).__init__(block, layers, num_classes)
+        if embed == 'word2vec':
+            self.linear_word_embedding = nn.Linear(300, 256, bias=False)
+        elif embed == 'fasttext':
+            self.linear_word_embedding = nn.Linear(300, 256, bias=False)
+        elif embed == 'concat':
+            self.linear_word_embedding = nn.Linear(600, 256, bias=False)
+        self.word2vec = np.load(os.path.join(data_dir, 'embeddings_%s_%s.npy'%(embed, dataset_name)),\
+                                allow_pickle=True).item()
+
+        if dataset_name == 'pascal':
+            self.classes = ['plane', 'bicycle', 'bird', 'boat',
+                            'bottle', 'bus', 'car', 'cat', 'chair',
+                            'cow', 'table', 'dog', 'horse',
+                            'motorbike', 'person', 'plant',
+                            'sheep', 'sofa', 'train', 'monitor']
+        elif dataset_name == 'coco':
+            self.classes = []
+            classes_f = open(os.path.join(data_dir, 'coco_classes.txt'), 'r')
+            for line in classes_f:
+                self.classes.append(line.strip().replace(' ', '_'))
+            classes_f.close()
+
+        self.reduction = nn.Conv2d(768, 256, 1, bias=False)
+
+        self.att_fc = nn.Linear(512, 512)
+
+    def coattend(self, va, vb, sprt_l):
+        """
+        Performs coattention between support set and query set
+        va: query features
+        vb: support features
+        sprt_l: support image-level label
+        """
+        channel = va.shape[1]*2
+        fea_size = va.shape[2:]
+
+        word_embedding = []
+        for cls in sprt_l:
+            cls = self.classes[cls-1]
+            word_embedding.append(torch.tensor(self.word2vec[cls]))
+        word_embedding = torch.stack(word_embedding).cuda().float()
+        word_embedding = self.linear_word_embedding(word_embedding)
+
+        vb_proto = nn.AvgPool2d(vb.shape[2:])(vb)
+        v = torch.cat((word_embedding, vb_proto.squeeze()), dim=1)
+        channel_wise_attention = nn.functional.softmax(self.att_fc(v), dim=1)
+
+        v = v * channel_wise_attention
+        v_rep = v.unsqueeze(2).unsqueeze(2).repeat(1, 1, va.shape[2], va.shape[3])
+        va = torch.cat((va, v_rep), 1)
+        za = self.reduction(va)
+        return za
+
+
 class WordEmbedResNet(CoResNet):
     def __init__(self, block, layers, num_classes, data_dir='./datasets/', embed='word2vec', dataset_name='pascal'):
         super(WordEmbedResNet, self).__init__(block, layers, num_classes)
