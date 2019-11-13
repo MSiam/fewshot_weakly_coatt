@@ -121,7 +121,6 @@ def meta_train(options):
         print('Epoch:', epoch,'LR:', scheduler.get_lr())
         begin_time = time.time()
         tqdm_gen = tqdm.tqdm(trainloader)
-        floss = open('loss_epoch.txt', 'w')
         for i_iter, batch in enumerate(tqdm_gen):
             query_rgb, query_mask,support_rgb, support_mask,history_mask, _, _, sample_class,index= batch
 
@@ -148,7 +147,6 @@ def meta_train(options):
 
             loss = loss_calc_v1(pred, query_mask, 0)
             loss.backward()
-            floss.write('iter %01d loss %0.6f\n'%(i_iter, loss))
             optimizer.step()
 
             tqdm_gen.set_description('e:%d loss = %.4f-:%.4f' % (
@@ -161,7 +159,6 @@ def meta_train(options):
                 plot_loss(checkpoint_dir, loss_list, save_pred_every)
                 np.savetxt(os.path.join(checkpoint_dir, 'loss_history.txt'), np.array(loss_list))
                 tempory_loss = 0
-        floss.close()
         # ======================evaluate now==================
         with torch.no_grad():
             print ('----Evaluation----')
