@@ -328,7 +328,7 @@ class WebSetupDataset(Dataset):
         self.classes = ['aeroplane', 'bicycle', 'bird', 'boat',
                 'bottle', 'bus', 'car', 'cat', 'chair',
                 'cow', 'diningtable', 'dog', 'horse',
-                'motorbike', 'person', 'pottedplant',
+                'motorbike', 'person', 'potted plant',
                 'sheep', 'sofa', 'train', 'tvmonitor']
 
         self.modify_sprt_to_web('google_', fold)
@@ -352,15 +352,14 @@ class WebSetupDataset(Dataset):
         support_rgb = self.normalize(
             self.ToTensor(
                 scale_transform_rgb(
-                        Image.open(support_name))))
+                        Image.open(support_name).convert('RGB'))))
         support_rgb = support_rgb.unsqueeze(0)
 
         support_mask = torch.zeros(support_rgb.shape[0], 1,
                                    support_rgb.shape[2], support_rgb.shape[3])
         support_original = np.array(
                                 scale_transform_rgb(
-                                    Image.open(support_name )))
+                                    Image.open(support_name ).convert('RGB')))
         support_original = np.expand_dims(support_original, axis=0)
-
         return query_rgb, query_mask, support_rgb, support_mask,history_mask, \
                     support_original, qry_original, sample_class,index
