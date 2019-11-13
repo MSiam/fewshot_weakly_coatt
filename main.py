@@ -145,6 +145,11 @@ parser.add_argument('-num_workers',
                     default=1,
                     help='num workers')
 
+parser.add_argument('-side_loss',
+                    type=int,
+                    default=0,
+                    help='flag to enable side loss')
+
 def main(argv=None):
     options = parser.parse_args()
     if options.split not in ['trainval', 'val', 'test']:

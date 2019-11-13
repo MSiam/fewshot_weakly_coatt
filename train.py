@@ -134,7 +134,8 @@ def meta_train(options):
             if options.model_type == 'vanilla':
                 pred = model(query_rgb, support_rgb, support_mask,history_mask)
             else:
-                pred, pred_sprt = model(query_rgb, support_rgb, sample_class,history_mask)
+                pred, pred_sprt, extras = model(query_rgb, support_rgb, sample_class,history_mask,
+                                                options.side_loss)
             pred_softmax=F.softmax(pred,dim=1).data.cpu()
             pred_sprt_softmax=F.softmax(pred_sprt,dim=1).data.cpu()
 
@@ -147,7 +148,16 @@ def meta_train(options):
             pred_sprt = nn.functional.interpolate(pred_sprt,size=input_size, mode='bilinear',align_corners=True)#upsample
 
             loss = loss_calc_v1(pred, query_mask, 0)
-            loss += loss_calc_v1(pred_sprt, support_mask[:,0,0,...], 0)
+            loss += loss_calc_v1(pred_sprt, support_mask[:,0,0,...].long(), 0)
+            if extras is not None:
+                sprt_mask_resized = nn.functional.interpolate(support_mask[:,0,...], size=extras[0].shape[2:],
+                                                              mode='nearest')
+                qry_mask_resized = nn.functional.interpolate(query_mask.unsqueeze(1).float(), size=extras[1].shape[2:],
+                                                             mode='nearest')
+
+                loss += loss_calc_v1(extras[0], sprt_mask_resized[:,0].long(), 0)
+                loss += loss_calc_v1(extras[1], qry_mask_resized[:,0].long(), 0)
+
             loss.backward()
             optimizer.step()
 

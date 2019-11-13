@@ -213,7 +213,7 @@ class WordEmbedCoResNet(CoResNet):
         uq = self.reduction(uq)
         us = self.reduction(us)
 
-        return uq, us
+        return uq, us, input2_mask, input1_mask
 
     def decode(self, att_summaries, visual_feats, size, history_mask,
                feature_size):
@@ -240,7 +240,7 @@ class WordEmbedCoResNet(CoResNet):
         out=self.layer9(out)
         return out
 
-    def forward(self, query_rgb, support_rgb, support_lbl, history_mask):
+    def forward(self, query_rgb, support_rgb, support_lbl, history_mask, side_output=0):
         nwe = self.extract_nwe(support_lbl)
         srgb_size = support_rgb.shape
         support_rgb = support_rgb.view(-1, srgb_size[2], srgb_size[3], srgb_size[4])
@@ -302,12 +302,18 @@ class WordEmbedCoResNet(CoResNet):
             z = self.filmed_coattend(query_rgb_rep, support_rgb, gammas_256,
                                      betas_256)
         else:
-            zq, zs = self.coattend(query_rgb_rep, support_rgb, nwe_rep)
+            zq, zs, gate_q, gate_s = self.coattend(query_rgb_rep, support_rgb, nwe_rep)
 
         history_mask=F.interpolate(history_mask,feature_size,mode='bilinear',align_corners=True)
         outq = self.decode(zq, query_rgb, srgb_size, history_mask, feature_size)
         outs = self.decode(zs, support_rgb, srgb_size, None, feature_size)
-        return outq, outs
+        if side_output:
+            gate_s = torch.cat((1-gate_s, gate_s), dim=1)
+            gate_q = torch.cat((1-gate_q, gate_q), dim=1)
+            extras = [gate_s, gate_q]
+        else:
+            extras = None
+        return outq, outs, extras
 
 class WordEmbedResNet(CoResNet):
     def __init__(self, block, layers, num_classes, data_dir='./datasets/', embed='word2vec', dataset_name='pascal'):
