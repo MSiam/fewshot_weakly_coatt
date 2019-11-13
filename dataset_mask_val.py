@@ -315,14 +315,16 @@ class OSLSMSetupDataset(Dataset):
         return query_rgb, query_mask, support_rgb, support_mask,history_mask, \
                     support_original, qry_original, sample_class,index
 
-class WebSetupDataset(OSLSMSetupDataset):
+class WebSetupDataset(Dataset):
     def __init__(self, data_dir, fold, input_size=[500, 500],
                  normalize_mean=[0, 0, 0], normalize_std=[1, 1, 1],
-                 seed=None):
+                 seed=None, split='test', n_shots=1):
+
 
         super(WebSetupDataset, self).__init__(data_dir, fold, input_size,
                                               normalize_mean, normalize_std,
-                                              seed)
+                                              seed, split=split)
+
         self.classes = ['aeroplane', 'bicycle', 'bird', 'boat',
                 'bottle', 'bus', 'car', 'cat', 'chair',
                 'cow', 'diningtable', 'dog', 'horse',
@@ -335,12 +337,12 @@ class WebSetupDataset(OSLSMSetupDataset):
         for it, (qry, cls, sprt) in enumerate(self.query_class_support_list):
             files = sorted(glob.glob(self.data_dir+'/'+prefix_pth+str(fold)+'/'+\
                                 self.classes[cls-1]+'*'))
-            self.query_class_support_list[it].append(files[0])
+            self.query_class_support_list[it].append(self.rand.choice(files))
 
     def __getitem__(self, index):
-        query_rgb, query_mask, _, support_mask,\
+        query_rgb, query_mask, _, _,\
             history_mask, _, qry_original, \
-            sample_class,index = super(WebSetupDataset, self).__getitem__(index)
+            sample_class, index = super(WebSetupDataset, self).__getitem__(index)
 
         scaled_size = self.input_size[0]
         scale_transform_rgb = torchvision.transforms.Resize([scaled_size, scaled_size],
@@ -351,10 +353,14 @@ class WebSetupDataset(OSLSMSetupDataset):
             self.ToTensor(
                 scale_transform_rgb(
                         Image.open(support_name))))
+        support_rgb = support_rgb.unsqueeze(0)
 
+        support_mask = torch.zeros(support_rgb.shape[0], 1,
+                                   support_rgb.shape[2], support_rgb.shape[3])
         support_original = np.array(
                                 scale_transform_rgb(
                                     Image.open(support_name )))
+        support_original = np.expand_dims(support_original, axis=0)
 
         return query_rgb, query_mask, support_rgb, support_mask,history_mask, \
                     support_original, qry_original, sample_class,index

@@ -4,7 +4,7 @@ import torch.backends.cudnn as cudnn
 import torch
 from models import Res_Deeplab
 import torch.nn as nn
-from dataset_mask_val import Dataset as Dataset_val
+from dataset_mask_val import Dataset, WebSetupDataset
 from torch.utils import data
 import torch.nn.functional as F
 from utils import *
@@ -62,6 +62,10 @@ def test_multi_runs(options, mode='best'):
         nfold_classes = 20
         nfold_out_classes = 60
 
+    if options.use_web:
+        Dataset_val = WebSetupDataset
+    else:
+        Dataset_val = Dataset
 
     with torch.no_grad():
         print ('----Evaluation----')
