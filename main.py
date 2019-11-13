@@ -142,6 +142,11 @@ parser.add_argument('-dataset_name',
                     default='pascal',
                     help='Name of dataset: pascal/coco')
 
+parser.add_argument('-backbone',
+                    type=str,
+                    default='resnet50',
+                    help='Backbone for Encoder resnet50/ resnet101')
+
 parser.add_argument('-num_workers',
                     type=int,
                     default=1,

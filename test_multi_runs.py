@@ -34,7 +34,8 @@ def test_multi_runs(options, mode='best'):
 
     # Create network.
     model = Res_Deeplab(data_dir=data_dir, num_classes=num_class, model_type=options.model_type,
-                        filmed=options.film, embed=options.embed_type, dataset_name=options.dataset_name)
+                        filmed=options.film, embed=options.embed_type, dataset_name=options.dataset_name,
+                        backbone=options.backbone)
 
     #load trained parameter
     checkpoint_dir = os.path.join(options.exp_dir, options.ckpt, 'fo=%d'% options.fold)
