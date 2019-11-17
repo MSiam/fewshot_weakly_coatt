@@ -313,7 +313,7 @@ class VisualWordEmbedResNet(CoResNet):
                 self.classes.append(line.strip().replace(' ', '_'))
             classes_f.close()
 
-        self.reduction = nn.Conv2d(768, 256, 1, bias=False)
+        self.reduction = nn.Conv2d(1024, 256, 1, bias=False)
 
         self.att_fc = nn.Linear(512, 512)
 
@@ -340,7 +340,10 @@ class VisualWordEmbedResNet(CoResNet):
 
         v = v * channel_wise_attention
         v_rep = v.unsqueeze(2).unsqueeze(2).repeat(1, 1, va.shape[2], va.shape[3])
-        va = torch.cat((va, v_rep), 1)
+        word_embedding_rep = word_embedding.unsqueeze(2).unsqueeze(2).repeat(1, 1,
+                                                                             va.shape[2],
+                                                                             va.shape[3])
+        va = torch.cat((va, v_rep, word_embedding_rep), 1)
         za = self.reduction(va)
         return za
 

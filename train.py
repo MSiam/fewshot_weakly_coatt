@@ -260,8 +260,8 @@ def meta_train(options):
         tensorboard.add_scalar('training/loss', training_loss, epoch)
         tensorboard.add_scalar('training/learning_rate', scheduler.get_lr(), epoch)
 
-        test_miou = test_multi_runs(options, mode='last')
-        tensorboard.add_scalar('test/mean_iou', test_miou, epoch)
+#        test_miou = test_multi_runs(options, mode='last')
+#        tensorboard.add_scalar('test/mean_iou', test_miou, epoch)
 
         scheduler.step()
 
