@@ -146,8 +146,12 @@ def meta_train(options):
                 dataset.history_mask_list[sub_index]=pred_softmax[j]
 
             pred = nn.functional.interpolate(pred,size=input_size, mode='bilinear',align_corners=True)#upsample
-
             loss = loss_calc_v1(pred, query_mask, 0)
+
+            sprt_pred = model.module.input1_mask
+            sprt_mask = nn.functional.interpolate(support_mask, size=sprt_pred.shape[2:],
+                                                  mode='bilinear',align_corners=True)
+            loss += loss_calc_v1(sprt_pred, sprt_mask, 0)
             loss.backward()
             optimizer.step()
 

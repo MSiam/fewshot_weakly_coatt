@@ -183,26 +183,40 @@ class WordEmbedCoResNet(CoResNet):
         word_embedding = word_embedding.unsqueeze(2).unsqueeze(2)
         word_embedding_tiled = word_embedding.repeat(1, 1, va.shape[2], va.shape[3])
 
-        va = torch.cat((va, word_embedding_tiled), 1)
-        vb = torch.cat((vb, word_embedding_tiled), 1)
+        va_ = torch.cat((va, word_embedding_tiled), 1)
+        vb_ = torch.cat((vb, word_embedding_tiled), 1)
 
-        exemplar_flat = vb.view(vb.shape[0], vb.shape[1], -1) #N,C,H*W
-        query_flat = va.view(va.shape[0], va.shape[1], -1)
+        exemplar_flat = vb_.view(vb_.shape[0], vb_.shape[1], -1) #N,C,H*W
+        query_flat = va_.view(va_.shape[0], va_.shape[1], -1)
 
         exemplar_t = torch.transpose(exemplar_flat,1,2).contiguous()
         exemplar_corr = self.linear_e(exemplar_t)
         S = torch.bmm(exemplar_corr, query_flat)
         Sc = F.softmax(S, dim = 1) #
+        Sr = F.softmax(torch.transpose(S, 1, 2), dim = 1) #
 
-        za = torch.bmm(exemplar_flat, Sc).contiguous()
-        za = za.view(-1, channel, fea_size[0], fea_size[1])
+        uq = torch.bmm(exemplar_flat, Sc).contiguous()
+        uq = uq.view(-1, channel, fea_size[0], fea_size[1])
 
-        input2_mask = self.gate(za)
-        input2_mask = self.gate_s(input2_mask)
+        us = torch.bmm(query_flat, Sr).contiguous()
+        us = us.view(-1, channel, fea_size[0], fea_size[1])
 
-        za = za * input2_mask
-        za = self.reduction(za)
-        return za
+        input2_mask = self.gate(uq)
+        self.input2_mask = self.gate_s(input2_mask)
+
+        input1_mask = self.gate(us)
+        self.input1_mask = self.gate_s(input1_mask)
+
+        uq = uq * self.input2_mask
+        vb_proto = nn.AvgPool2d(vb.shape[2:])(vb * self.input1_mask)
+        vs_proto_tiled = vb_proto.repeat(1, 1, vb.shape[2], vb.shape[3])
+
+#        uq = self.reduction(uq)
+#        us = self.reduction(us)
+
+        uq = torch.cat((uq, vb_proto_tiled, word_embedding_tiled), 1)
+        uq = self.reduction(uq)
+        return uq
 
     def forward(self, query_rgb, support_rgb, support_lbl, history_mask):
         nwe = self.extract_nwe(support_lbl)
