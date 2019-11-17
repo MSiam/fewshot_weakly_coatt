@@ -81,7 +81,7 @@ def meta_train(options):
                             lr=learning_rate, momentum=momentum, weight_decay=weight_decay)
     snapshot_manager = SnapshotManager(snapshot_dir=os.path.join(checkpoint_dir, 'snapshot'),
                                        logging_frequency=1, snapshot_frequency=1)
-    last_epoch = snapshot_manager.restore(model, optimizer)
+    last_epoch = snapshot_manager.restore(model, optimizer, ignore_nonexist_layers=True)
     print(f'Loaded epoch {last_epoch}')
     if last_epoch == 0:
         scheduler = StepLR(optimizer, step_size=step_steplr, gamma=options.gamma_steplr)
@@ -149,9 +149,10 @@ def meta_train(options):
             loss = loss_calc_v1(pred, query_mask, 0)
 
             sprt_pred = model.module.input1_mask
-            sprt_mask = nn.functional.interpolate(support_mask, size=sprt_pred.shape[2:],
+            sprt_pred = torch.cat((1-sprt_pred, sprt_pred), dim=1)
+            sprt_mask = nn.functional.interpolate(support_mask[:,0], size=sprt_pred.shape[2:],
                                                   mode='bilinear',align_corners=True)
-            loss += loss_calc_v1(sprt_pred, sprt_mask, 0)
+            loss += loss_calc_v1(sprt_pred, sprt_mask[:,0], 0)
             loss.backward()
             optimizer.step()
 

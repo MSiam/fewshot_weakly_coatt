@@ -123,6 +123,7 @@ class WordEmbedCoResNet(CoResNet):
         if self.film_gen is None:
             self.linear_e = nn.Linear(512, 512, bias = False)
             self.reduction = nn.Conv2d(512, 256, 1, bias=False)
+            self.reduction_proto = nn.Conv2d(1024, 256, 1, bias=False)
             self.gate = nn.Conv2d(512, 1, kernel_size  = 1, bias = False)
         else:
             self.inplanes = 512
@@ -214,8 +215,8 @@ class WordEmbedCoResNet(CoResNet):
 #        uq = self.reduction(uq)
 #        us = self.reduction(us)
 
-        uq = torch.cat((uq, vb_proto_tiled, word_embedding_tiled), 1)
-        uq = self.reduction(uq)
+        uq = torch.cat((uq, vs_proto_tiled, word_embedding_tiled), 1)
+        uq = self.reduction_proto(uq)
         return uq
 
     def forward(self, query_rgb, support_rgb, support_lbl, history_mask):
@@ -280,7 +281,7 @@ class WordEmbedCoResNet(CoResNet):
             z = self.filmed_coattend(query_rgb_rep, support_rgb, gammas_256,
                                      betas_256)
         else:
-            z = self.coattend(query_rgb_rep, support_rgb, nwe_rep, srgb_size)
+            z = self.coattend(query_rgb_rep, support_rgb, nwe_rep)
 
         history_mask=F.interpolate(history_mask,feature_size,mode='bilinear',align_corners=True)
         #z = z.view(srgb_size[0], srgb_size[1], z.shape[1], z.shape[2], z.shape[3])
