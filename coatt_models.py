@@ -73,7 +73,7 @@ class CoResNet(ResNet):
 
 
         h,w=support_rgb.shape[-2:][0],support_rgb.shape[-2:][1]
-        z = self.coattend(query_rgb, support_rgb, support_lbl)
+        z = self.coattend(query_rgb, support_rgb, support_lbl, srgb_size)
 
         history_mask=F.interpolate(history_mask,feature_size,mode='bilinear',align_corners=True)
 
@@ -266,10 +266,11 @@ class WordEmbedCoResNet(CoResNet):
             z = self.filmed_coattend(query_rgb_rep, support_rgb, gammas_256,
                                      betas_256)
         else:
-            z = self.coattend(query_rgb_rep, support_rgb, nwe_rep)
+            z = self.coattend(query_rgb_rep, support_rgb, nwe_rep, srgb_size)
 
         history_mask=F.interpolate(history_mask,feature_size,mode='bilinear',align_corners=True)
-        z = z.view(srgb_size[0], srgb_size[1], z.shape[1], z.shape[2], z.shape[3])
+        #z = z.view(srgb_size[0], srgb_size[1], z.shape[1], z.shape[2], z.shape[3])
+        z = z.view(srgb_size[0], 1, z.shape[1], z.shape[2], z.shape[3])
         z = torch.mean(z, dim=1)
 
         out=torch.cat([query_rgb,z],dim=1)
@@ -317,7 +318,7 @@ class VisualWordEmbedResNet(CoResNet):
 
         self.att_fc = nn.Linear(512, 512)
 
-    def coattend(self, va, vb, sprt_l):
+    def coattend(self, va, vb, sprt_l, srgb_size):
         """
         Performs coattention between support set and query set
         va: query features
@@ -333,11 +334,14 @@ class VisualWordEmbedResNet(CoResNet):
             word_embedding.append(torch.tensor(self.word2vec[cls]))
         word_embedding = torch.stack(word_embedding).cuda().float()
         word_embedding = self.linear_word_embedding(word_embedding)
-
         vb_proto = nn.AvgPool2d(vb.shape[2:])(vb)
+        vb_proto = vb_proto.view(srgb_size[0], srgb_size[1], vb_proto.shape[1],
+                                 vb_proto.shape[2], vb_proto.shape[3])
+        vb_proto = vb_proto.mean(dim=1)
+
+        #z = z.view(srgb_size[0], srgb_size[1], z.shape[1], z.shape[2], z.shape[3])
         v = torch.cat((word_embedding, vb_proto.squeeze()), dim=1)
         channel_wise_attention = nn.functional.softmax(self.att_fc(v), dim=1)
-
         v = v * channel_wise_attention
         v_rep = v.unsqueeze(2).unsqueeze(2).repeat(1, 1, va.shape[2], va.shape[3])
         word_embedding_rep = word_embedding.unsqueeze(2).unsqueeze(2).repeat(1, 1,

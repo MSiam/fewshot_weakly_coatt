@@ -109,14 +109,15 @@ def test_multi_runs(options, mode='best'):
                 if options.model_type == 'vanilla':
                     pred = model(query_rgb, support_rgb, support_mask,history_mask)
                 else:
-                    pred=model(query_rgb, support_rgb, sample_class,history_mask)
+                    pred=model(query_rgb, support_rgb, sample_class, history_mask)
+                    pred=model(query_rgb, support_rgb, sample_class, pred)
 
                 pred_softmax = F.softmax(pred, dim=1).data.cpu()
 
                 # update history mask
-                for j in range(support_mask.shape[0]):
-                    sub_index = index[j]
-                    inferset.history_mask_list[sub_index] = pred_softmax[j]
+#                for j in range(support_mask.shape[0]):
+#                    sub_index = index[j]
+#                    inferset.history_mask_list[sub_index] = pred_softmax[j]
 
                 pred = nn.functional.interpolate(pred, size=input_size, mode='bilinear',
                                                      align_corners=True)  #upsample  # upsample
