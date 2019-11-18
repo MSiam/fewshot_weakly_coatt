@@ -175,7 +175,7 @@ def meta_train(options):
                                          split=options.split, seed=initial_seed+eva_iter)
                 else:
                     valset, _ = create_coco_fewshot(data_dir, 'trainval', input_size=input_size,
-                                                 n_ways=1, n_shots=1, max_iters=1000, fold=options.fold,
+                                                 n_ways=1, n_shots=options.n_shots, max_iters=1000, fold=options.fold,
                                                  prob=options.prob, seed=initial_seed+eva_iter)
 
                 valset.history_mask_list=[None] * 1000
