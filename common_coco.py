@@ -180,9 +180,9 @@ class PairedDataset(Dataset):
                 history_mask = torch.zeros(2, 41, 41).fill_(0.0)
 
         #return sample
-        return sample['query_images'][0], sample['query_masks'][0][1], sample['support_images'][0][0], \
-                sample['support_mask'][0][0]['fg_mask'].unsqueeze(0), history_mask, sample['support_images_t'][0][0], \
-                sample['query_images_t'][0], sample['class_ids'][0], idx
+        return sample['query_images'][0], sample['query_masks'][0][1], torch.stack(sample['support_images'][0]), \
+                sample['support_mask'][0][0]['fg_mask'].unsqueeze(0).unsqueeze(1), history_mask, \
+                torch.stack(sample['support_images_t'][0]), sample['query_images_t'][0], sample['class_ids'][0], idx
 
 class Subset(Dataset):
     """
