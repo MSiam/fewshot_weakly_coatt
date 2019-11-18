@@ -5,7 +5,7 @@ DATA_DIR_COCO=/mnt/datasets/public/research/COCO
 # download datasets
 python pascal_voc_download.py --dataset-dir $DATA_DIR
 python sbd_download.py --dataset-dir $DATA_DIR
-python coco_download.py --dataset_dir $DATA_DIR_COCO
+python coco_download.py --dataset-dir $DATA_DIR_COCO
 
 # overrides train.txt to use train_aug for SBD data ensuring no overlap with val data
 cp train_aug.txt "$DATA_DIR"/ImageSets/Segmentation/train.txt
