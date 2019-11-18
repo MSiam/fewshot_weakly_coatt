@@ -172,10 +172,10 @@ def meta_train(options):
                 if options.dataset_name == 'pascal':
                     valset = Dataset_val(data_dir=data_dir, fold=options.fold, input_size=input_size,
                                          normalize_mean=IMG_MEAN, normalize_std=IMG_STD,
-                                         split=options.split, seed=initial_seed+eva_iter)
+                                         split=options.split, seed=initial_seed+eva_iter, n_shots=options.n_shots)
                 else:
                     valset, _ = create_coco_fewshot(data_dir, 'trainval', input_size=input_size,
-                                                 n_ways=1, n_shots=options.n_shots, max_iters=1000, fold=options.fold,
+                                                 n_ways=1, n_shots=1, max_iters=1000, fold=options.fold,
                                                  prob=options.prob, seed=initial_seed+eva_iter)
 
                 valset.history_mask_list=[None] * 1000
