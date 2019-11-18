@@ -81,7 +81,7 @@ def meta_train(options):
                             lr=learning_rate, momentum=momentum, weight_decay=weight_decay)
     snapshot_manager = SnapshotManager(snapshot_dir=os.path.join(checkpoint_dir, 'snapshot'),
                                        logging_frequency=1, snapshot_frequency=1)
-    last_epoch = snapshot_manager.restore(model, optimizer)
+    last_epoch = snapshot_manager.restore(model, optimizer, ignore_nonexist_layers=True)
     print(f'Loaded epoch {last_epoch}')
     if last_epoch == 0:
         scheduler = StepLR(optimizer, step_size=step_steplr, gamma=options.gamma_steplr)

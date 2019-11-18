@@ -123,6 +123,7 @@ class WordEmbedCoResNet(CoResNet):
         if self.film_gen is None:
             self.linear_e = nn.Linear(512, 512, bias = False)
             self.reduction = nn.Conv2d(512, 256, 1, bias=False)
+            self.reduction_protos = nn.Conv2d(512, 256, 1, bias=False)
             self.gate = nn.Conv2d(512, 1, kernel_size  = 1, bias = False)
         else:
             self.inplanes = 512
@@ -216,7 +217,7 @@ class WordEmbedCoResNet(CoResNet):
         return uq, us, input2_mask, input1_mask
 
     def decode(self, att_summaries, visual_feats, size, history_mask,
-               feature_size, sprt_flag=False):
+               feature_size, sprt_flag=False, prototypes=None):
 
         if not sprt_flag: # Use mean over all shots
             att_summaries = att_summaries.view(size[0], size[1],
@@ -225,6 +226,10 @@ class WordEmbedCoResNet(CoResNet):
                                                att_summaries.shape[3])
 
             att_summaries = torch.mean(att_summaries, dim=1)
+
+        if prototypes is not None:
+            att_summaries = torch.cat([att_summaries, prototypes],dim=1)
+            att_summaries = self.reduction_protos(att_summaries)
 
         out = torch.cat([visual_feats, att_summaries],dim=1)
         out = self.layer55(out)
@@ -302,23 +307,34 @@ class WordEmbedCoResNet(CoResNet):
 
         nwe_rep = nwe.unsqueeze(1).repeat(1, srgb_size[1], 1)
         nwe_rep = nwe_rep.view(-1, nwe.shape[1])
+
+        # Compute output from coattention for both sprt and qry
         if self.film_gen is not None:
             z = self.filmed_coattend(query_rgb_rep, support_rgb, gammas_256,
                                      betas_256)
         else:
             zq, zs, gate_q, gate_s = self.coattend(query_rgb_rep, support_rgb, nwe_rep)
 
-        history_mask=F.interpolate(history_mask,feature_size,mode='bilinear',align_corners=True)
-
+        # Upsample history masks for support set
         history_masks_sprt = history_masks_sprt.view(-1, history_masks_sprt.shape[2],
                                                      history_masks_sprt.shape[3],
                                                      history_masks_sprt.shape[4])
         history_masks_sprt=F.interpolate(history_masks_sprt, feature_size,mode='bilinear',align_corners=True)
 
-        outq = self.decode(zq, query_rgb, srgb_size, history_mask,
-                           feature_size, sprt_flag=False)
+        # Decode predictions for support set and consutrct prototypes
         outs = self.decode(zs, support_rgb, srgb_size, history_masks_sprt,
-                           feature_size, sprt_flag=True)
+                           feature_size, sprt_flag=True, prototypes=None)
+        protos = torch.sum(outs[:,1].unsqueeze(1) * support_rgb, dim=[2,3])
+        protos = protos.view(srgb_size[0], srgb_size[1], protos.shape[1], 1, 1)
+        protos = protos.mean(dim=1)
+        protos = protos.repeat(1, 1, zq.shape[2], zq.shape[3])
+
+        # upsample history_mask for decoding of query
+        history_mask=F.interpolate(history_mask,feature_size,mode='bilinear',align_corners=True)
+
+        # Decode predictions for query based on prototypes
+        outq = self.decode(zq, query_rgb, srgb_size, history_mask,
+                           feature_size, sprt_flag=False, prototypes=protos)
 
         if side_output:
             gate_s = torch.cat((1-gate_s, gate_s), dim=1)
