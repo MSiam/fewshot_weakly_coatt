@@ -39,30 +39,46 @@ def optim_or_not(model, yes):
             param.requires_grad = False
 
 
-def turn_off(model, filmed):
+def turn_off(model, filmed, freeze_decoder=False):
     optim_or_not(model.module.conv1, False)
     optim_or_not(model.module.layer1, False)
     optim_or_not(model.module.layer2, False)
     if not filmed:
         optim_or_not(model.module.layer3, False)
 
-def get_10x_lr_params(model, model_type, filmed, ftune_backbone):
+    if freeze_decoder:
+        optim_or_not(model.module.layer55, False)
+        optim_or_not(model.module.residule1, False)
+        optim_or_not(model.module.residule2, False)
+        optim_or_not(model.module.residule3, False)
+        optim_or_not(model.module.layer6_0, False)
+        optim_or_not(model.module.layer6_1, False)
+        optim_or_not(model.module.layer6_2, False)
+        optim_or_not(model.module.layer6_3, False)
+        optim_or_not(model.module.layer6_4, False)
+        optim_or_not(model.module.layer7, False)
+        optim_or_not(model.module.layer9, False)
+
+def get_10x_lr_params(model, model_type, filmed,
+                      ftune_backbone, ftune_decoder=True):
     """
     get layers for optimization
     """
 
     b = []
+
+    # Encoder Parameters
     if ftune_backbone:
         b.append(model.module.conv1.parameters())
         b.append(model.module.bn1.parameters())
         b.append(model.module.layer1.parameters())
         b.append(model.module.layer2.parameters())
         b.append(model.module.layer3.parameters())
-    b.append(model.module.layer5.parameters())
+
+    # Multi-Modal Interaction Module Parameters
     if model_type == 'coatt':
         b.append(model.module.linear_e.parameters())
         b.append(model.module.gate.parameters())
-
     elif model_type == 'nwe_coatt':
         b.append(model.module.linear_e.parameters())
         b.append(model.module.gate.parameters())
@@ -72,11 +88,10 @@ def get_10x_lr_params(model, model_type, filmed, ftune_backbone):
             b.append(model.module.film_gen.parameters())
         else:
             b.append(model.module.reduction.parameters())
-
+            b.append(model.module.reduction_protos.parameters())
     elif model_type == 'nwe':
         b.append(model.module.linear_word_embedding.parameters())
         b.append(model.module.reduction.parameters())
-
     elif model_type == 'iter_nwe_coatt':
         b.append(model.module.linear_e.parameters())
         b.append(model.module.gate.parameters())
@@ -84,17 +99,20 @@ def get_10x_lr_params(model, model_type, filmed, ftune_backbone):
         b.append(model.module.reduction.parameters())
         b.append(model.module.reduction_cat.parameters())
 
-    b.append(model.module.layer55.parameters())
-    b.append(model.module.layer6_0.parameters())
-    b.append(model.module.layer6_1.parameters())
-    b.append(model.module.layer6_2.parameters())
-    b.append(model.module.layer6_3.parameters())
-    b.append(model.module.layer6_4.parameters())
-    b.append(model.module.layer7.parameters())
-    b.append(model.module.layer9.parameters())
-    b.append(model.module.residule1.parameters())
-    b.append(model.module.residule2.parameters())
-    b.append(model.module.residule3.parameters())
+    # Decoder Parameters
+    if ftune_decoder:
+        b.append(model.module.layer5.parameters())
+        b.append(model.module.layer55.parameters())
+        b.append(model.module.layer6_0.parameters())
+        b.append(model.module.layer6_1.parameters())
+        b.append(model.module.layer6_2.parameters())
+        b.append(model.module.layer6_3.parameters())
+        b.append(model.module.layer6_4.parameters())
+        b.append(model.module.layer7.parameters())
+        b.append(model.module.layer9.parameters())
+        b.append(model.module.residule1.parameters())
+        b.append(model.module.residule2.parameters())
+        b.append(model.module.residule3.parameters())
 
     for j in range(len(b)):
         for i in b[j]:

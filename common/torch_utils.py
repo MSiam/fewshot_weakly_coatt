@@ -33,8 +33,8 @@ class SnapshotManager:
         self.losses = {'training': {}, 'validation': {}}
         self.time_track = {}
 
-    def load_params_wz_ignore(self, model):
-        saved_state_dict = t.load(self.model_snapshot_file)
+    def load_params_wz_ignore(self, model, snapshot_file):
+        saved_state_dict = t.load(snapshot_file)
         own_state_dict = model.state_dict()
 
         for k, param in saved_state_dict.items():
@@ -49,11 +49,12 @@ class SnapshotManager:
                 ignore_nonexist_layers=False) -> int:
         if model is not None and os.path.isfile(self.model_snapshot_file):
             if ignore_nonexist_layers:
-                self.load_params_wz_ignore(model)
+                self.load_params_wz_ignore(model, self.model_snapshot_file)
             else:
                 model.load_state_dict(t.load(self.model_snapshot_file))
         if optimizer is not None and os.path.isfile(self.optimizer_snapshot_file):
-            optimizer.load_state_dict(t.load(self.optimizer_snapshot_file))
+            if not ignore_nonexist_layers:
+                optimizer.load_state_dict(t.load(self.optimizer_snapshot_file))
         iteration = t.load(self.iteration_file)['iteration'] if os.path.isfile(self.iteration_file) else 0
         if os.path.isfile(self.losses_file):
             losses = t.load(self.losses_file)

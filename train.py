@@ -57,7 +57,10 @@ def meta_train(options):
 
     # disable the  gradients of not optomized layers
     if not options.ftune_backbone:
-        turn_off(model, filmed=options.film)
+        if not options.ftune_decoder:
+            turn_off(model, filmed=options.film, freeze_decoder=True)
+        else:
+            turn_off(model, filmed=options.film, freeze_decoder=False)
 
     checkpoint_dir = os.path.join(options.exp_dir, options.ckpt, 'fo=%d'% options.fold)
     check_dir(checkpoint_dir)
@@ -76,19 +79,20 @@ def meta_train(options):
     save_pred_every = len(trainloader) - 1
 
     # create optimizer
-    optimizer = optim.SGD([{'params': get_10x_lr_params(model, options.model_type, options.film, options.ftune_backbone),
+    optimizer = optim.SGD([{'params': get_10x_lr_params(model, options.model_type, options.film,
+                                                        options.ftune_backbone, options.ftune_decoder),
                             'lr': 10 * learning_rate}],
                             lr=learning_rate, momentum=momentum, weight_decay=weight_decay)
     snapshot_manager = SnapshotManager(snapshot_dir=os.path.join(checkpoint_dir, 'snapshot'),
                                        logging_frequency=1, snapshot_frequency=1)
     last_epoch = snapshot_manager.restore(model, optimizer, ignore_nonexist_layers=True)
     print(f'Loaded epoch {last_epoch}')
-    if last_epoch == 0:
-        scheduler = StepLR(optimizer, step_size=step_steplr, gamma=options.gamma_steplr)
-        scheduler = StepLR(optimizer, step_size=step_steplr, gamma=options.gamma_steplr, last_epoch=0)
-        last_epoch = -1
-    else:
-        scheduler = StepLR(optimizer, step_size=step_steplr, gamma=options.gamma_steplr, last_epoch=last_epoch+1)
+#    if last_epoch == 0:
+#        scheduler = StepLR(optimizer, step_size=step_steplr, gamma=options.gamma_steplr)
+#        scheduler = StepLR(optimizer, step_size=step_steplr, gamma=options.gamma_steplr, last_epoch=0)
+#        last_epoch = -1
+#    else:
+#        scheduler = StepLR(optimizer, step_size=step_steplr, gamma=options.gamma_steplr, last_epoch=last_epoch+1)
 
     # Compute mapping used for setting validation mIoU
     mapping = {}
@@ -120,7 +124,7 @@ def meta_train(options):
 
     for epoch in range(last_epoch+1, num_epoch):
         print('Running epoch ', epoch, ' from ', num_epoch)
-        print('Epoch:', epoch,'LR:', scheduler.get_lr())
+#        print('Epoch:', epoch,'LR:', #scheduler.get_lr())
         begin_time = time.time()
         tqdm_gen = tqdm.tqdm(trainloader)
         for i_iter, batch in enumerate(tqdm_gen):
@@ -288,11 +292,11 @@ def meta_train(options):
         # Log epoch metrics
         tensorboard.add_scalar('validation/best_iou', best_iou, epoch)
         tensorboard.add_scalar('training/loss', training_loss, epoch)
-        tensorboard.add_scalar('training/learning_rate', scheduler.get_lr(), epoch)
+#        tensorboard.add_scalar('training/learning_rate', scheduler.get_lr(), epoch)
 
         test_miou = test_multi_runs(options, mode='last', num_runs=1)
         tensorboard.add_scalar('test/mean_iou', test_miou, epoch)
 
-        scheduler.step()
+#        scheduler.step()
 
     tensorboard.close()

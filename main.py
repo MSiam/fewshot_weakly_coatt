@@ -155,6 +155,12 @@ parser.add_argument('-ftune_backbone',
                     default=0,
                     help='option to finetune the backbone or not')
 
+parser.add_argument('-ftune_decoder',
+                    type=int,
+                    default=1,
+                    help='option to finetune the backbone or not')
+
+
 def main(argv=None):
     options = parser.parse_args()
     if options.split not in ['trainval', 'val', 'test']:
