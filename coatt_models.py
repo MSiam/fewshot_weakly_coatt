@@ -249,7 +249,6 @@ class WordEmbedCoResNet(CoResNet):
 
     def forward(self, query_rgb, support_rgb, support_lbl, history_mask,
                 history_masks_sprt, side_output=0):
-
         nwe = self.extract_nwe(support_lbl)
         srgb_size = support_rgb.shape
         support_rgb = support_rgb.view(-1, srgb_size[2], srgb_size[3], srgb_size[4])
@@ -324,7 +323,8 @@ class WordEmbedCoResNet(CoResNet):
         # Decode predictions for support set and consutrct prototypes
         outs = self.decode(zs, support_rgb, srgb_size, history_masks_sprt,
                            feature_size, sprt_flag=True, prototypes=None)
-        protos = torch.sum(outs[:,1].unsqueeze(1) * support_rgb, dim=[2,3])
+        pred = F.softmax(outs, dim=1)
+        protos = torch.sum(pred[:,1].unsqueeze(1) * support_rgb, dim=[2,3]) / torch.sum(pred[:, 1])
         protos = protos.view(srgb_size[0], srgb_size[1], protos.shape[1], 1, 1)
         protos = protos.mean(dim=1)
         protos = protos.repeat(1, 1, zq.shape[2], zq.shape[3])
