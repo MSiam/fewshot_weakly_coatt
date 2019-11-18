@@ -23,7 +23,7 @@ def save(save_dir, support_rgb, support_mask, query_rgb, pred, iter_i):
         cv2.imwrite(save_dir+'/sprt_lbl/'+'%05d'%(iter_i+i)+'.png', smask[0].cpu().numpy())
         cv2.imwrite(save_dir+'/qry_pred/'+'%05d'%(iter_i+i)+'.png', p.cpu().numpy())
 
-def test_multi_runs(options, mode='best'):
+def test_multi_runs(options, mode='best', eva_iters=5):
     data_dir = options.data_dir
 
     IMG_MEAN = [0.485, 0.456, 0.406]
@@ -75,7 +75,7 @@ def test_multi_runs(options, mode='best'):
         initial_seed = options.seed
         eva_iters_means = []
         eva_iters_fgbg_means = []
-        for eva_iter in range(5):
+        for eva_iter in range(eva_iters):
             seed = options.seed + eva_iter
             if options.dataset_name == 'pascal':
                 inferset = Dataset_val(data_dir=data_dir, fold=options.fold, input_size=input_size, normalize_mean=IMG_MEAN,

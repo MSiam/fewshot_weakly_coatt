@@ -169,7 +169,7 @@ class WordEmbedCoResNet(CoResNet):
         word_embedding = torch.stack(word_embedding).cuda().float()
         return word_embedding
 
-    def coattend(self, va, vb, word_embedding):
+    def coattend(self, va, vb, word_embedding, srgb_size):
         """
         Performs coattention between support set and query set
         va: query features
@@ -210,10 +210,16 @@ class WordEmbedCoResNet(CoResNet):
 
         uq = uq * self.input2_mask
         vb_proto = nn.AvgPool2d(vb.shape[2:])(vb * self.input1_mask)
+        vb_proto = vb_proto.view(srgb_size[0], srgb_size[1], vb_proto.shape[1], 1, 1)
+        vb_proto = torch.mean(vb_proto, dim=1)
         vs_proto_tiled = vb_proto.repeat(1, 1, vb.shape[2], vb.shape[3])
 
-#        uq = self.reduction(uq)
-#        us = self.reduction(us)
+        uq = uq.view(srgb_size[0], srgb_size[1], uq.shape[1], uq.shape[2], uq.shape[3])
+        uq = torch.mean(uq, dim=1)
+
+        word_embedding_tiled = word_embedding_tiled.view(srgb_size[0], srgb_size[1], word_embedding_tiled.shape[1],
+                                        word_embedding_tiled.shape[2], word_embedding_tiled.shape[3])
+        word_embedding_tiled = word_embedding_tiled[:,0]
 
         uq = torch.cat((uq, vs_proto_tiled, word_embedding_tiled), 1)
         uq = self.reduction_proto(uq)
@@ -281,10 +287,8 @@ class WordEmbedCoResNet(CoResNet):
             z = self.filmed_coattend(query_rgb_rep, support_rgb, gammas_256,
                                      betas_256)
         else:
-            z = self.coattend(query_rgb_rep, support_rgb, nwe_rep)
-
+            z = self.coattend(query_rgb_rep, support_rgb, nwe_rep, srgb_size)
         history_mask=F.interpolate(history_mask,feature_size,mode='bilinear',align_corners=True)
-        #z = z.view(srgb_size[0], srgb_size[1], z.shape[1], z.shape[2], z.shape[3])
         z = z.view(srgb_size[0], 1, z.shape[1], z.shape[2], z.shape[3])
         z = torch.mean(z, dim=1)
 

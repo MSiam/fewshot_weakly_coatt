@@ -108,6 +108,7 @@ def meta_train(options):
     if len(snapshot_manager.losses['validation']) > 0:
         iou_list = list(snapshot_manager.losses['validation'].values())
         highest_iou = np.max(iou_list)
+        highest_iou = 0 ###################################### Remove later just small test
 
     model.cuda()
     model = model.train()
@@ -149,6 +150,7 @@ def meta_train(options):
             loss = loss_calc_v1(pred, query_mask, 0)
 
             sprt_pred = model.module.input1_mask
+            sprt_pred = sprt_pred.view(-1, options.n_shots, 1, 41, 41).mean(dim=1)
             sprt_pred = torch.cat((1-sprt_pred, sprt_pred), dim=1)
             sprt_mask = nn.functional.interpolate(support_mask[:,0], size=sprt_pred.shape[2:],
                                                   mode='bilinear',align_corners=True)
@@ -177,7 +179,8 @@ def meta_train(options):
                 if options.dataset_name == 'pascal':
                     valset = Dataset_val(data_dir=data_dir, fold=options.fold, input_size=input_size,
                                          normalize_mean=IMG_MEAN, normalize_std=IMG_STD,
-                                         split=options.split, seed=initial_seed+eva_iter)
+                                         split=options.split, seed=initial_seed+eva_iter,
+                                         n_shots=options.n_shots)
                 else:
                     valset, _ = create_coco_fewshot(data_dir, 'trainval', input_size=input_size,
                                                  n_ways=1, n_shots=1, max_iters=1000, fold=options.fold,
@@ -265,8 +268,8 @@ def meta_train(options):
         tensorboard.add_scalar('training/loss', training_loss, epoch)
         tensorboard.add_scalar('training/learning_rate', scheduler.get_lr(), epoch)
 
-#        test_miou = test_multi_runs(options, mode='last')
-#        tensorboard.add_scalar('test/mean_iou', test_miou, epoch)
+        test_miou = test_multi_runs(options, mode='last', eva_iters=1)
+        tensorboard.add_scalar('test/mean_iou', test_miou, epoch)
 
         scheduler.step()
 
