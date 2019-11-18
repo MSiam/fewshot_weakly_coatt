@@ -29,6 +29,7 @@ class Dataset(object):
         self.binary_pair_list = self.get_binary_pair_list()
         self.input_size = input_size
         self.history_mask_list = [None] * self.__len__()
+        self.history_mask_list_sprt = [None] * self.__len__() * n_shots
         self.prob=prob#probability of sampling history masks=0
 
     def get_new_exist_class_dict(self, fold):
@@ -94,7 +95,8 @@ class Dataset(object):
         support_rgbs = []
         support_masks = []
         support_originals = []
-        for support_name in support_names:
+        history_masks_sprt = []
+        for i, support_name in enumerate(support_names):
             support_rgb = self.normalize(
                 self.ToTensor(
                     scale_transform_rgb(
@@ -112,12 +114,23 @@ class Dataset(object):
                               Image.open(
                                   os.path.join(self.data_dir, 'Binary_map_aug', 'train', str(sample_class),
                                                support_name + '.png')))))
+
             #margin_h = self.rand.randint(0, scaled_size - input_size)
             #margin_w = self.rand.randint(0, scaled_size - input_size)
             #support_rgb = support_rgb[:, margin_h:margin_h + input_size, margin_w:margin_w + input_size]
             #support_original = support_original[margin_h:margin_h + input_size, margin_w:margin_w + input_size, :]
             #support_mask = support_mask[:, margin_h:margin_h + input_size, margin_w:margin_w + input_size]
 
+            # History Mask for support used in IOM
+            if self.history_mask_list_sprt[index*self.n_shots+i] is None:
+                history_mask_sprt = torch.zeros(2,41,41).fill_(0.0)
+            else:
+                if self.rand.random()>self.prob:
+                    history_mask_sprt = self.history_mask_list_sprt[index*self.n_shots+i]
+                else:
+                    history_mask_sprt = torch.zeros(2, 41, 41).fill_(0.0)
+
+            history_masks_sprt.append(history_mask_sprt)
             support_rgbs.append(support_rgb)
             support_masks.append(support_mask)
             support_originals.append(support_original)
@@ -125,6 +138,7 @@ class Dataset(object):
         support_rgbs = torch.stack(support_rgbs)
         support_masks = torch.stack(support_masks)
         support_originals = np.asarray(support_originals)
+        history_masks_sprt = torch.stack(history_masks_sprt)
 
         # random scale and crop for query
         scaled_size = input_size  # random.randint(323, 350)
@@ -158,10 +172,9 @@ class Dataset(object):
         qry_original = qry_original[margin_h:margin_h + input_size, margin_w:margin_w + input_size, :]
         query_mask = query_mask[:, margin_h:margin_h + input_size, margin_w:margin_w + input_size]
 
+        # History Mask for query used in IOM
         if self.history_mask_list[index] is None:
-
             history_mask=torch.zeros(2,41,41).fill_(0.0)
-
         else:
             if self.rand.random()>self.prob:
                 history_mask=self.history_mask_list[index]
@@ -169,7 +182,7 @@ class Dataset(object):
                 history_mask = torch.zeros(2, 41, 41).fill_(0.0)
 
         return query_rgb, query_mask, support_rgbs, support_masks, history_mask, \
-                support_originals, qry_original, sample_class, index
+                history_masks_sprt, support_originals, qry_original, sample_class, index
 
     def flip(self, flag, img):
         if flag > 0.5:

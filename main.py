@@ -140,22 +140,29 @@ parser.add_argument('-dataset_name',
                     default='pascal',
                     help='Name of dataset: pascal/coco')
 
+parser.add_argument('-backbone',
+                    type=str,
+                    default='resnet50',
+                    help='Backbone for Encoder resnet50/ resnet101')
+
 parser.add_argument('-num_workers',
                     type=int,
                     default=1,
                     help='num workers')
 
-parser.add_argument('-side_loss',
+parser.add_argument('-ftune_backbone',
                     type=int,
                     default=0,
-                    help='flag to enable side loss')
+                    help='option to finetune the backbone or not')
 
 def main(argv=None):
     options = parser.parse_args()
     if options.split not in ['trainval', 'val', 'test']:
         print('Error in split')
 
-    options = Namespace(load_and_save_params(vars(options), options.exp_dir))
+#    options = Namespace(load_and_save_params(vars(options), options.exp_dir))
+
+    # To ensure reproducability
     if options.reproducability:
         torch.backends.cudnn.benchmark = False
         torch.backends.cudnn.deterministic = True

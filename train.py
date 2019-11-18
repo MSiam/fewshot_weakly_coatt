@@ -1,6 +1,5 @@
 from torch.utils import data
 import torch.optim as optim
-import torch.backends.cudnn as cudnn
 import os.path as osp
 from utils import *
 import time
@@ -49,14 +48,16 @@ def meta_train(options):
 
     # Create network.
     model = Res_Deeplab(data_dir=data_dir, num_classes=num_class, model_type=options.model_type,
-                        filmed=options.film, embed=options.embed_type, dataset_name=options.dataset_name)
+                        filmed=options.film, embed=options.embed_type, dataset_name=options.dataset_name,
+                        backbone=options.backbone)
 
     # load resnet-50 preatrained parameter
-    model = load_resnet50_param(model, stop_layer='layer4')
+    model = load_resnet_param(model, model_name=options.backbone, stop_layer='layer4')
     model=nn.DataParallel(model,[0])
 
     # disable the  gradients of not optomized layers
-    turn_off(model, filmed=options.film)
+    if not options.ftune_backbone:
+        turn_off(model, filmed=options.film)
 
     checkpoint_dir = os.path.join(options.exp_dir, options.ckpt, 'fo=%d'% options.fold)
     check_dir(checkpoint_dir)
@@ -74,9 +75,10 @@ def meta_train(options):
     trainloader = data.DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=options.num_workers)
     save_pred_every = len(trainloader) - 1
 
-    optimizer = optim.SGD([{'params': get_10x_lr_params(model, options.model_type, options.film),
-                        'lr': 10 * learning_rate}],
-                        lr=learning_rate, momentum=momentum, weight_decay=weight_decay)
+    # create optimizer
+    optimizer = optim.SGD([{'params': get_10x_lr_params(model, options.model_type, options.film, options.ftune_backbone),
+                            'lr': 10 * learning_rate}],
+                            lr=learning_rate, momentum=momentum, weight_decay=weight_decay)
     snapshot_manager = SnapshotManager(snapshot_dir=os.path.join(checkpoint_dir, 'snapshot'),
                                        logging_frequency=1, snapshot_frequency=1)
     last_epoch = snapshot_manager.restore(model, optimizer)
@@ -105,22 +107,25 @@ def meta_train(options):
         loss_list = list(snapshot_manager.losses['training'].values())
     if len(snapshot_manager.losses['validation']) > 0:
         iou_list = list(snapshot_manager.losses['validation'].values())
-        highest_iou = np.max(iou_list)
+        highest_iou = 0#np.max(iou_list)
 
-    tensorboard = SummaryWriter(log_dir = os.path.join(checkpoint_dir, 'tensorboard'))
     model.cuda()
-    tempory_loss = 0  # accumulated loss
     model = model.train()
+
+    # initialize vars for summaries and logging
+    tensorboard = SummaryWriter(log_dir = os.path.join(checkpoint_dir, 'tensorboard'))
+    tempory_loss = 0  # accumulated loss
     best_epoch=0
     snapshot_manager.enable_time_tracking()
+
     for epoch in range(last_epoch+1, num_epoch):
         print('Running epoch ', epoch, ' from ', num_epoch)
         print('Epoch:', epoch,'LR:', scheduler.get_lr())
         begin_time = time.time()
         tqdm_gen = tqdm.tqdm(trainloader)
-
         for i_iter, batch in enumerate(tqdm_gen):
-            query_rgb, query_mask,support_rgb, support_mask,history_mask, _, _, sample_class,index= batch
+            query_rgb, query_mask,support_rgb, support_mask,history_mask, history_masks_sprt,\
+                    _, _, sample_class,index= batch
 
             query_rgb = (query_rgb).cuda(0)
             support_rgb = (support_rgb).cuda(0)
@@ -128,27 +133,33 @@ def meta_train(options):
             query_mask = (query_mask).cuda(0).long()  # change formation for crossentropy use
             query_mask = query_mask[:, 0, :, :]  # remove the second dim,change formation for crossentropy use
             history_mask=(history_mask).cuda(0)
-
+            history_masks_sprt=(history_masks_sprt).cuda(0)
 
             optimizer.zero_grad()
             if options.model_type == 'vanilla':
                 pred = model(query_rgb, support_rgb, support_mask,history_mask)
             else:
-                pred, pred_sprt, extras = model(query_rgb, support_rgb, sample_class,history_mask,
-                                                options.side_loss)
+                pred, pred_sprt, extras = model(query_rgb, support_rgb, sample_class, history_mask,
+                                                history_masks_sprt, False)
             pred_softmax=F.softmax(pred,dim=1).data.cpu()
             pred_sprt_softmax=F.softmax(pred_sprt,dim=1).data.cpu()
 
-            #update history mask
+            #update history mask query
             for j in range (support_mask.shape[0]):
                 sub_index=index[j]
                 dataset.history_mask_list[sub_index]=pred_softmax[j]
+                for k in range(options.n_shots):
+                    dataset.history_mask_list_sprt[sub_index*options.n_shots+k] = \
+                            pred_sprt_softmax[j*options.n_shots+k]
 
             pred = nn.functional.interpolate(pred,size=input_size, mode='bilinear',align_corners=True)#upsample
             pred_sprt = nn.functional.interpolate(pred_sprt,size=input_size, mode='bilinear',align_corners=True)#upsample
+            support_mask = support_mask.view(pred_sprt.shape[0], support_mask.shape[2], support_mask.shape[3],
+                                             support_mask.shape[4])
 
             loss = loss_calc_v1(pred, query_mask, 0)
-            loss += loss_calc_v1(pred_sprt, support_mask[:,0,0,...].long(), 0)
+            loss += loss_calc_v1(pred_sprt, support_mask[:,0].long(), 0)
+
             if extras is not None:
                 sprt_mask_resized = nn.functional.interpolate(support_mask[:,0,...], size=extras[0].shape[2:],
                                                               mode='nearest')
@@ -163,7 +174,6 @@ def meta_train(options):
 
             tqdm_gen.set_description('e:%d loss = %.4f-:%.4f' % (
             epoch, loss.item(),highest_iou))
-
 
             #save training loss
             tempory_loss += loss.item()
@@ -182,21 +192,26 @@ def meta_train(options):
             initial_seed = options.seed #+ epoch
             for eva_iter in range(options.iter_time):
                 if options.dataset_name == 'pascal':
-                    valset = Dataset_val(data_dir=data_dir, fold=options.fold, input_size=input_size, normalize_mean=IMG_MEAN,
-                                         normalize_std=IMG_STD, split=options.split, seed=initial_seed+eva_iter)
+                    valset = Dataset_val(data_dir=data_dir, fold=options.fold, input_size=input_size,
+                                         normalize_mean=IMG_MEAN, normalize_std=IMG_STD,
+                                         split=options.split, seed=initial_seed+eva_iter,
+                                         n_shots=options.n_shots)
                 else:
                     valset, _ = create_coco_fewshot(data_dir, 'trainval', input_size=input_size,
                                                  n_ways=1, n_shots=1, max_iters=1000, fold=options.fold,
                                                  prob=options.prob, seed=initial_seed+eva_iter)
 
                 valset.history_mask_list=[None] * 1000
-                valloader = data.DataLoader(valset, batch_size=options.bs_val, shuffle=False, num_workers=options.num_workers,
+                valset.history_mask_list_sprt=[None] * 1000 * options.n_shots
+                valloader = data.DataLoader(valset, batch_size=options.bs_val, shuffle=False,
+                                            num_workers=options.num_workers,
                                             drop_last=False)
 
                 all_inter, all_union, all_predict = [0] * nfold_out_classes, [0] * nfold_out_classes, [0] * nfold_out_classes
                 for i_iter, batch in enumerate(valloader):
                     print('Eva Iter ', i_iter)
-                    query_rgb, query_mask, support_rgb, support_mask, history_mask, _, _, sample_class, index = batch
+                    query_rgb, query_mask, support_rgb, support_mask, history_mask, \
+                            history_masks_sprt, _, _, sample_class, index = batch
                     query_rgb = (query_rgb).cuda(0)
                     support_rgb = (support_rgb).cuda(0)
                     support_mask = (support_mask).cuda(0)
@@ -204,21 +219,26 @@ def meta_train(options):
 
                     query_mask = query_mask[:, 0, :, :]  # remove the second dim,change formation for crossentropy use
                     history_mask = (history_mask).cuda(0)
+                    history_masks_sprt = (history_masks_sprt).cuda(0)
 
                     if options.model_type == 'vanilla':
                         pred = model(query_rgb, support_rgb, support_mask,history_mask)
                     else:
-                        pred, _ = model(query_rgb, support_rgb, sample_class,history_mask)
-                    pred_softmax = F.softmax(pred, dim=1).data.cpu()
+                        pred, pred_sprt, _ = model(query_rgb, support_rgb, sample_class, history_mask,
+                                                   history_masks_sprt, False)
+                    pred_softmax = F.softmax(pred,dim=1).data.cpu()
+                    pred_sprt_softmax = F.softmax(pred_sprt,dim=1).data.cpu()
 
-                    # update history mask
-                    for j in range(support_mask.shape[0]):
-                        sub_index = index[j]
-                        valset.history_mask_list[sub_index] = pred_softmax[j]
+                    #update history mask query
+                    for j in range (support_mask.shape[0]):
+                        sub_index=index[j]
+                        dataset.history_mask_list[sub_index]=pred_softmax[j]
+                        for k in range(options.n_shots):
+                            dataset.history_mask_list_sprt[sub_index*options.n_shots+k] = \
+                                    pred_sprt_softmax[j*options.n_shots+k]
 
                     pred = nn.functional.interpolate(pred, size=input_size, mode='bilinear',
                                                          align_corners=True)  #upsample  # upsample
-
                     _, pred_label = torch.max(pred, 1)
                     inter_list, union_list, _, num_predict_list = get_iou_v1(query_mask, pred_label)
                     for j in range(query_mask.shape[0]):#batch size
@@ -270,8 +290,8 @@ def meta_train(options):
         tensorboard.add_scalar('training/loss', training_loss, epoch)
         tensorboard.add_scalar('training/learning_rate', scheduler.get_lr(), epoch)
 
-#        test_miou = test_multi_runs(options, mode='last')
-#        tensorboard.add_scalar('test/mean_iou', test_miou, epoch)
+        test_miou = test_multi_runs(options, mode='last', num_runs=1)
+        tensorboard.add_scalar('test/mean_iou', test_miou, epoch)
 
         scheduler.step()
 

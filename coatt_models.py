@@ -216,14 +216,16 @@ class WordEmbedCoResNet(CoResNet):
         return uq, us, input2_mask, input1_mask
 
     def decode(self, att_summaries, visual_feats, size, history_mask,
-               feature_size):
+               feature_size, sprt_flag=False):
 
-        att_summaries = att_summaries.view(size[0], size[1],
-                                           att_summaries.shape[1],
-                                           att_summaries.shape[2],
-                                           att_summaries.shape[3])
+        if not sprt_flag: # Use mean over all shots
+            att_summaries = att_summaries.view(size[0], size[1],
+                                               att_summaries.shape[1],
+                                               att_summaries.shape[2],
+                                               att_summaries.shape[3])
 
-        att_summaries = torch.mean(att_summaries, dim=1)
+            att_summaries = torch.mean(att_summaries, dim=1)
+
         out = torch.cat([visual_feats, att_summaries],dim=1)
         out = self.layer55(out)
         if history_mask is not None:
@@ -240,7 +242,9 @@ class WordEmbedCoResNet(CoResNet):
         out=self.layer9(out)
         return out
 
-    def forward(self, query_rgb, support_rgb, support_lbl, history_mask, side_output=0):
+    def forward(self, query_rgb, support_rgb, support_lbl, history_mask,
+                history_masks_sprt, side_output=0):
+
         nwe = self.extract_nwe(support_lbl)
         srgb_size = support_rgb.shape
         support_rgb = support_rgb.view(-1, srgb_size[2], srgb_size[3], srgb_size[4])
@@ -305,8 +309,17 @@ class WordEmbedCoResNet(CoResNet):
             zq, zs, gate_q, gate_s = self.coattend(query_rgb_rep, support_rgb, nwe_rep)
 
         history_mask=F.interpolate(history_mask,feature_size,mode='bilinear',align_corners=True)
-        outq = self.decode(zq, query_rgb, srgb_size, history_mask, feature_size)
-        outs = self.decode(zs, support_rgb, srgb_size, None, feature_size)
+
+        history_masks_sprt = history_masks_sprt.view(-1, history_masks_sprt.shape[2],
+                                                     history_masks_sprt.shape[3],
+                                                     history_masks_sprt.shape[4])
+        history_masks_sprt=F.interpolate(history_masks_sprt, feature_size,mode='bilinear',align_corners=True)
+
+        outq = self.decode(zq, query_rgb, srgb_size, history_mask,
+                           feature_size, sprt_flag=False)
+        outs = self.decode(zs, support_rgb, srgb_size, history_masks_sprt,
+                           feature_size, sprt_flag=True)
+
         if side_output:
             gate_s = torch.cat((1-gate_s, gate_s), dim=1)
             gate_q = torch.cat((1-gate_q, gate_q), dim=1)

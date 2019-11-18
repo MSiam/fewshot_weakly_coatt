@@ -6,8 +6,7 @@ import urllib.request as request
 import pathlib
 from zipfile import ZipFile
 
-# The URL where the PASCAL VOC data can be downloaded.
-# http://host.robots.ox.ac.uk/pascal/VOC/voc2012/#devkit
+# The URL where the MS COCOC data can be downloaded.
 DATASET_URL_TRAIN = 'http://images.cocodataset.org/zips/train2014.zip'
 DATASET_URL_VAL = 'http://images.cocodataset.org/zips/val2014.zip'
 DATASET_URL_ANNOT = 'http://images.cocodataset.org/annotations/annotations_trainval2014.zip'
@@ -54,7 +53,7 @@ if __name__ == "__main__":
         help='Path to the raw data')
     args = parser.parse_args()
 
-#    download_and_uncompress_dataset(args.dataset_dir, DATASET_URL_TRAIN)
-#    download_and_uncompress_dataset(args.dataset_dir, DATASET_URL_VAL)
+    download_and_uncompress_dataset(args.dataset_dir, DATASET_URL_TRAIN)
+    download_and_uncompress_dataset(args.dataset_dir, DATASET_URL_VAL)
     download_and_uncompress_dataset(args.dataset_dir, DATASET_URL_ANNOT)
 

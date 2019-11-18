@@ -3,10 +3,13 @@ import os
 import torch
 from pylab import plt
 
+def load_resnet_param(model, model_name, stop_layer='layer4'):
+    if model_name == 'resnet50':
+        resnet = torchvision.models.resnet50(pretrained=True)
+    elif model_name == 'resnet101':
+        resnet = torchvision.models.resnet101(pretrained=True)
 
-def load_resnet50_param(model, stop_layer='layer4'):
-    resnet50 = torchvision.models.resnet50(pretrained=True)
-    saved_state_dict = resnet50.state_dict()
+    saved_state_dict = resnet.state_dict()
     new_params = model.state_dict().copy()
 
     for i in saved_state_dict:  # copy params from resnet50,except layers after stop_layer
@@ -28,9 +31,6 @@ def check_dir(checkpoint_dir):#create a dir if dir not exists
         os.makedirs(os.path.join(checkpoint_dir,'model'))
         os.makedirs(os.path.join(checkpoint_dir,'pred_img'))
 
-
-
-
 def optim_or_not(model, yes):
     for param in model.parameters():
         if yes:
@@ -46,12 +46,18 @@ def turn_off(model, filmed):
     if not filmed:
         optim_or_not(model.module.layer3, False)
 
-def get_10x_lr_params(model, model_type, filmed):
+def get_10x_lr_params(model, model_type, filmed, ftune_backbone):
     """
     get layers for optimization
     """
 
     b = []
+    if ftune_backbone:
+        b.append(model.module.conv1.parameters())
+        b.append(model.module.bn1.parameters())
+        b.append(model.module.layer1.parameters())
+        b.append(model.module.layer2.parameters())
+        b.append(model.module.layer3.parameters())
     b.append(model.module.layer5.parameters())
     if model_type == 'coatt':
         b.append(model.module.linear_e.parameters())

@@ -3,7 +3,7 @@ import argparse
 import torch
 from models import Res_Deeplab
 import torch.nn as nn
-from dataset_mask_val import Dataset as Dataset_val
+from dataset_mask_val import Dataset, WebSetupDataset
 from torch.utils import data
 import torch.nn.functional as F
 from utils import *
@@ -21,7 +21,7 @@ def save(save_dir, support_rgb, support_mask, query_rgb, pred, iter_i):
         cv2.imwrite(save_dir+'/sprt_lbl/'+'%05d'%(iter_i+i)+'.png', smask[0].cpu().numpy())
         cv2.imwrite(save_dir+'/qry_pred/'+'%05d'%(iter_i+i)+'.png', p.cpu().numpy())
 
-def test_multi_runs(options, mode='best'):
+def test_multi_runs(options, mode='best', num_runs=5):
     data_dir = options.data_dir
 
     IMG_MEAN = [0.485, 0.456, 0.406]
@@ -32,7 +32,8 @@ def test_multi_runs(options, mode='best'):
 
     # Create network.
     model = Res_Deeplab(data_dir=data_dir, num_classes=num_class, model_type=options.model_type,
-                        filmed=options.film, embed=options.embed_type, dataset_name=options.dataset_name)
+                        filmed=options.film, embed=options.embed_type, dataset_name=options.dataset_name,
+                        backbone=options.backbone)
 
     #load trained parameter
     checkpoint_dir = os.path.join(options.exp_dir, options.ckpt, 'fo=%d'% options.fold)
@@ -60,6 +61,10 @@ def test_multi_runs(options, mode='best'):
         nfold_classes = 20
         nfold_out_classes = 60
 
+    if options.use_web:
+        Dataset_val = WebSetupDataset
+    else:
+        Dataset_val = Dataset
 
     with torch.no_grad():
         print ('----Evaluation----')
@@ -68,7 +73,7 @@ def test_multi_runs(options, mode='best'):
         initial_seed = options.seed
         eva_iters_means = []
         eva_iters_fgbg_means = []
-        for eva_iter in range(5):
+        for eva_iter in range(num_runs):
             seed = options.seed + eva_iter
             if options.dataset_name == 'pascal':
                 inferset = Dataset_val(data_dir=data_dir, fold=options.fold, input_size=input_size, normalize_mean=IMG_MEAN,
@@ -82,14 +87,16 @@ def test_multi_runs(options, mode='best'):
                                         drop_last=False)
 
 
-            inferset.history_mask_list=[None] * 1000
+            inferset.history_mask_list = [None] * 1000
+            inferset.history_mask_list_sprt = [None] * 1000 * options.n_shots
+
             best_iou = 0
             all_inter, all_union, all_predict = [0] * nfold_classes, [0] * nfold_classes, [0] * nfold_classes
             all_fgbg_iou = []
 
             for i_iter, batch in enumerate(valloader):
                 print('Iteration ', i_iter)
-                query_rgb, query_mask, support_rgb, support_mask, history_mask, sprt_original, qry_original, \
+                query_rgb, query_mask, support_rgb, support_mask, hmask_qry, hmask_sprt, sprt_original, qry_original, \
                         sample_class, index = batch
                 query_rgb = (query_rgb).cuda(0)
                 support_rgb = (support_rgb).cuda(0)
@@ -97,27 +104,28 @@ def test_multi_runs(options, mode='best'):
                 query_mask = (query_mask).cuda(0).long()  # change formation for crossentropy use
 
                 query_mask = query_mask[:, 0, :, :]  # remove the second dim,change formation for crossentropy use
-                history_mask = (history_mask).cuda(0)
+                hmask_qry = (hmask_qry).cuda(0)
+                hmask_sprt = (hmask_sprt).cuda(0)
 
                 if options.model_type == 'vanilla':
                     pred = model(query_rgb, support_rgb, support_mask,history_mask)
                 else:
-                    pred, pred_sprt, _ = model(query_rgb, support_rgb, sample_class,history_mask)
+                    pred, pred_sprt, _ = model(query_rgb, support_rgb, sample_class, hmask_qry, hmask_sprt)
+                    pred_sprt = pred_sprt.view(hmask_sprt.shape[0], hmask_sprt.shape[1], pred_sprt.shape[1],
+                                               pred_sprt.shape[2], pred_sprt.shape[3])
+                    pred, pred_sprt, _ = model(query_rgb, support_rgb, sample_class, pred, pred_sprt)
 
                 pred_softmax = F.softmax(pred, dim=1).data.cpu()
                 pred_sprt_softmax = F.softmax(pred_sprt, dim=1).data.cpu()
 
-                # update history mask
-                for j in range(support_mask.shape[0]):
-                    sub_index = index[j]
-                    inferset.history_mask_list[sub_index] = pred_softmax[j]
-
                 pred = nn.functional.interpolate(pred, size=input_size, mode='bilinear',
-                                                     align_corners=True)  #upsample  # upsample
+                                                     align_corners=True)
                 pred_sprt = nn.functional.interpolate(pred_sprt, size=input_size, mode='bilinear',
-                                                     align_corners=True)  #upsample  # upsample
-#                plt.figure(1);plt.imshow(pred_softmax.detach().cpu()[0,1]);plt.figure(2);plt.imshow(query_mask[0].cpu());
-#                plt.figure(3);plt.imshow(pred_sprt_softmax.detach().cpu()[0,1]);plt.figure(4);plt.imshow(support_mask[0,0,0].cpu());plt.show()
+                                                     align_corners=True)
+#                plt.figure(1);plt.imshow(pred_softmax.detach().cpu()[0,1]);
+#                plt.figure(2);plt.imshow(query_mask[0].cpu());
+#                plt.figure(3);plt.imshow(pred_sprt_softmax.detach().cpu()[0,1]);
+#                plt.figure(4);plt.imshow(support_mask[0,0,0].cpu());plt.show()
 
                 _, pred_label = torch.max(pred, 1)
                 if options.save_vis != '' and eva_iter == 0:

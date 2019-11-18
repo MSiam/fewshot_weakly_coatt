@@ -34,6 +34,7 @@ class Dataset(object):
 
         self.binary_pair_list = self.get_binary_pair_list()#a dict of each class, which contains all imgs that include this class
         self.history_mask_list = [None] * 1000
+        self.history_mask_list_sprt = [None] * 1000 * n_shots
         self.query_class_support_list=[None] * 1000
         for index in range (1000):
             query_name=self.chosen_data_list[index][0]
@@ -106,10 +107,10 @@ class Dataset(object):
 
         input_size = self.input_size[0]
         # random scale and crop for support only during validation not testing
-        if self.split == 'test':
-            scaled_size = input_size
-        else:
-            scaled_size = int(self.rand.uniform(1,1.5)*input_size)
+#        if self.split == 'test':
+        scaled_size = input_size
+#        else:
+#            scaled_size = int(self.rand.uniform(1,1.5)*input_size)
 
         scale_transform_mask = torchvision.transforms.Resize([scaled_size, scaled_size], interpolation=Image.NEAREST)
         scale_transform_rgb = torchvision.transforms.Resize([scaled_size, scaled_size], interpolation=Image.BILINEAR)
@@ -118,13 +119,15 @@ class Dataset(object):
             flip_flag = 0
         else:
             flip_flag = self.rand.random()
-            margin_h = self.rand.randint(0, scaled_size - input_size)
-            margin_w = self.rand.randint(0, scaled_size - input_size)
+#            margin_h = self.rand.randint(0, scaled_size - input_size)
+#            margin_w = self.rand.randint(0, scaled_size - input_size)
 
         support_rgbs = []
         support_masks = []
         support_originals = []
-        for support_name in support_names:
+        history_masks_sprt = []
+        for i, support_name in enumerate(support_names):
+
             support_rgb = self.normalize(
                 self.ToTensor(
                     scale_transform_rgb(
@@ -142,18 +145,29 @@ class Dataset(object):
                               Image.open(
                                   os.path.join(self.data_dir, 'Binary_map_aug', 'val', str(sample_class),
                                                support_name + '.png')))))
-            if self.split != 'test': # No margins either during testing
-                support_rgb = support_rgb[:, margin_h:margin_h + input_size, margin_w:margin_w + input_size]
-                support_mask = support_mask[:, margin_h:margin_h + input_size, margin_w:margin_w + input_size]
-                support_original = support_original[margin_h:margin_h + input_size, margin_w:margin_w + input_size, :]
+#            if self.split != 'test': # No margins either during testing
+#                support_rgb = support_rgb[:, margin_h:margin_h + input_size, margin_w:margin_w + input_size]
+#                support_mask = support_mask[:, margin_h:margin_h + input_size, margin_w:margin_w + input_size]
+#                support_original = support_original[margin_h:margin_h + input_size, margin_w:margin_w + input_size, :]
+
+            # History Mask for support used in IOM
+            if self.history_mask_list_sprt[index*self.n_shots+i] is None:
+                history_mask_sprt = torch.zeros(2,41,41).fill_(0.0)
+            else:
+                if self.rand.random()>self.prob:
+                    history_mask_sprt = self.history_mask_list_sprt[index*self.n_shots+i]
+                else:
+                    history_mask_sprt = torch.zeros(2, 41, 41).fill_(0.0)
 
             support_rgbs.append(support_rgb)
             support_masks.append(support_mask)
             support_originals.append(support_original)
+            history_masks_sprt.append(history_mask_sprt)
 
         support_rgbs = torch.stack(support_rgbs)
         support_masks = torch.stack(support_masks)
         support_originals = np.asarray(support_originals)
+        history_masks_sprt = torch.stack(history_masks_sprt)
 
         # random scale and crop for query
         scaled_size = self.input_size[0]
@@ -192,7 +206,7 @@ class Dataset(object):
             history_mask=self.history_mask_list[index]
 
         return query_rgb, query_mask, support_rgbs, support_masks, history_mask, \
-                    support_originals, qry_original, sample_class,index
+                    history_masks_sprt, support_originals, qry_original, sample_class,index
 
     def flip(self, flag, img):
         if flag > 0.5:
@@ -315,18 +329,20 @@ class OSLSMSetupDataset(Dataset):
         return query_rgb, query_mask, support_rgb, support_mask,history_mask, \
                     support_original, qry_original, sample_class,index
 
-class WebSetupDataset(OSLSMSetupDataset):
+class WebSetupDataset(Dataset):
     def __init__(self, data_dir, fold, input_size=[500, 500],
                  normalize_mean=[0, 0, 0], normalize_std=[1, 1, 1],
-                 seed=None):
+                 seed=None, split='test', n_shots=1):
+
 
         super(WebSetupDataset, self).__init__(data_dir, fold, input_size,
                                               normalize_mean, normalize_std,
-                                              seed)
+                                              seed, split=split)
+
         self.classes = ['aeroplane', 'bicycle', 'bird', 'boat',
                 'bottle', 'bus', 'car', 'cat', 'chair',
                 'cow', 'diningtable', 'dog', 'horse',
-                'motorbike', 'person', 'pottedplant',
+                'motorbike', 'person', 'potted plant',
                 'sheep', 'sofa', 'train', 'tvmonitor']
 
         self.modify_sprt_to_web('google_', fold)
@@ -335,12 +351,12 @@ class WebSetupDataset(OSLSMSetupDataset):
         for it, (qry, cls, sprt) in enumerate(self.query_class_support_list):
             files = sorted(glob.glob(self.data_dir+'/'+prefix_pth+str(fold)+'/'+\
                                 self.classes[cls-1]+'*'))
-            self.query_class_support_list[it].append(files[0])
+            self.query_class_support_list[it].append(self.rand.choice(files))
 
     def __getitem__(self, index):
-        query_rgb, query_mask, _, support_mask,\
+        query_rgb, query_mask, _, _,\
             history_mask, _, qry_original, \
-            sample_class,index = super(WebSetupDataset, self).__getitem__(index)
+            sample_class, index = super(WebSetupDataset, self).__getitem__(index)
 
         scaled_size = self.input_size[0]
         scale_transform_rgb = torchvision.transforms.Resize([scaled_size, scaled_size],
@@ -350,11 +366,14 @@ class WebSetupDataset(OSLSMSetupDataset):
         support_rgb = self.normalize(
             self.ToTensor(
                 scale_transform_rgb(
-                        Image.open(support_name))))
+                        Image.open(support_name).convert('RGB'))))
+        support_rgb = support_rgb.unsqueeze(0)
 
+        support_mask = torch.zeros(support_rgb.shape[0], 1,
+                                   support_rgb.shape[2], support_rgb.shape[3])
         support_original = np.array(
                                 scale_transform_rgb(
-                                    Image.open(support_name )))
-
+                                    Image.open(support_name ).convert('RGB')))
+        support_original = np.expand_dims(support_original, axis=0)
         return query_rgb, query_mask, support_rgb, support_mask,history_mask, \
                     support_original, qry_original, sample_class,index
