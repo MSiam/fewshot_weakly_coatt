@@ -171,7 +171,6 @@ class PairedDataset(Dataset):
         # In case of very small objects that end with empty masks skip index
         cls = sample[0]['basic_class_id']
         if sample[0]['label'][cls].max() == 0 or sample[1]['label'][cls].max() == 0:
-            import pdb; pdb.set_trace()
             return self.__getitem__(idx+1)
         else:
             if self.pair_based_transforms is not None:

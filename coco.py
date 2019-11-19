@@ -325,7 +325,7 @@ def create_coco_fewshot(base_dir, split, input_size,
 
 if __name__ ==  "__main__":
     dataset, cat_ids = create_coco_fewshot('/home/msiam/Dataset/COCO/', 'trainval', input_size=(321, 321),
-                                          n_ways=1, n_shots=1, max_iters=30000, fold=1,
+                                          n_ways=1, n_shots=1, max_iters=30000, fold=2,
                                           prob=0.6, seed=1337)
     dataloader = data.DataLoader(dataset, batch_size=64, shuffle=False, num_workers=0,
                                 drop_last=False)
