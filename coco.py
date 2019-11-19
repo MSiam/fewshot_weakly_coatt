@@ -69,15 +69,6 @@ class COCOSeg(BaseDataset):
         semantic_masks = {catId: Image.fromarray(semantic_mask)
                           for catId, semantic_mask in semantic_masks.items()}
 
-        # Filter out small masks
-        temp_semantic_masks = semantic_masks.copy()
-        for catId, mask in semantic_masks.items():
-            mask_array = np.array(mask).copy()
-            mask_array[mask_array==catId] = 1
-            if np.sum(mask_array[mask_array==1]) < 10: # remove objects less than 10 pixels!
-                del temp_semantic_masks[catId]
-        semantic_masks = temp_semantic_masks
-
         sample = {'image': image,
                   'label': semantic_masks}
 
@@ -101,7 +92,6 @@ class COCOSeg(BaseDataset):
             for key_suffix in aux_attrib_val:
                 # one function may create multiple attributes, so we need suffix to distinguish them
                 sample[key_prefix + '_' + key_suffix] = aux_attrib_val[key_suffix]
-
         return sample
 
 class ToTensorNormalize(object):
