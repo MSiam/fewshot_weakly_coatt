@@ -95,7 +95,7 @@ def test_multi_runs(options, mode='best', num_runs=5):
             all_fgbg_iou = []
 
             for i_iter, batch in enumerate(valloader):
-                print('Iteration ', i_iter)
+#                print('Iteration ', i_iter)
                 query_rgb, query_mask, support_rgb, support_mask, hmask_qry, hmask_sprt, sprt_original, qry_original, \
                         sample_class, index = batch
                 query_rgb = (query_rgb).cuda(0)
