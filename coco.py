@@ -69,6 +69,15 @@ class COCOSeg(BaseDataset):
         semantic_masks = {catId: Image.fromarray(semantic_mask)
                           for catId, semantic_mask in semantic_masks.items()}
 
+        # Filter out small masks
+        temp_semantic_masks = semantic_masks.copy()
+        for catId, mask in semantic_masks.items():
+            mask_array = np.array(mask).copy()
+            mask_array[mask_array==catId] = 1
+            if np.sum(mask_array[mask_array==1]) < 10: # remove objects less than 10 pixels!
+                del temp_semantic_masks[catId]
+        semantic_masks = temp_semantic_masks
+
         sample = {'image': image,
                   'label': semantic_masks}
 
@@ -326,7 +335,7 @@ def create_coco_fewshot(base_dir, split, input_size,
 
 if __name__ ==  "__main__":
     dataset, cat_ids = create_coco_fewshot('/home/msiam/Dataset/COCO/', 'trainval', input_size=(321, 321),
-                                          n_ways=1, n_shots=1, max_iters=1000, fold=1,
+                                          n_ways=1, n_shots=1, max_iters=30000, fold=1,
                                           prob=0.6, seed=1337)
     dataloader = data.DataLoader(dataset, batch_size=64, shuffle=False, num_workers=0,
                                 drop_last=False)
@@ -340,4 +349,4 @@ if __name__ ==  "__main__":
        # plt.figure(3); plt.imshow(qry_mask[0]);
        # plt.figure(4); plt.imshow(sprt_mask[0]);plt.show()
         print('Class # ', cls)
-        import pdb; pdb.set_trace()
+       # import pdb; pdb.set_trace()
