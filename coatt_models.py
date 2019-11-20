@@ -248,7 +248,7 @@ class WordEmbedCoResNet(CoResNet):
         return out
 
     def forward(self, query_rgb, support_rgb, support_lbl, history_mask,
-                history_masks_sprt, side_output=0):
+                history_masks_sprt, side_output=False):
         nwe = self.extract_nwe(support_lbl)
         srgb_size = support_rgb.shape
         support_rgb = support_rgb.view(-1, srgb_size[2], srgb_size[3], srgb_size[4])

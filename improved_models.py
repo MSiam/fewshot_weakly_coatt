@@ -66,9 +66,10 @@ class IterativeWordEmbedCoResNet(WordEmbedCoResNet):
         uq = self.reduction(uq)
         us = self.reduction(us)
 
-        return uq, us
+        return uq, us, input2_mask, input1_mask
 
-    def forward(self, query_rgb, support_rgb, support_lbl, history_mask):
+    def forward(self, query_rgb, support_rgb, support_lbl, history_mask,
+                history_masks_sprt, side_output=False):
         srgb_size = support_rgb.shape
         support_rgb = support_rgb.view(-1, srgb_size[2], srgb_size[3], srgb_size[4])
 
@@ -104,13 +105,15 @@ class IterativeWordEmbedCoResNet(WordEmbedCoResNet):
         sqry_size = query_rgb_rep.shape
         query_rgb_rep = query_rgb_rep.view(-1, sqry_size[2], sqry_size[3], sqry_size[4])
 
-        va1, vb1 = self.coattend(query_rgb_rep, support_rgb, support_lbl, srgb_size)
+        va1, vb1, _, _ = self.coattend(query_rgb_rep, support_rgb, support_lbl, srgb_size)
 
         va1 = self.relu(self.reduction_cat(torch.cat([query_rgb_rep, va1], dim=1)))
         vb1 = self.relu(self.reduction_cat(torch.cat([support_rgb, vb1], dim=1)))
 
-        va2, _ = self.coattend(va1, vb1, support_lbl, srgb_size)
-        z = va1 + va2
+        va2, vb2, _, _ = self.coattend(va1, vb1, support_lbl, srgb_size)
+
+        zq = va1 + va2
+        zs = vb1 + vb2
 
 #        va2, vb2 = self.coattend(va1, vb1, support_lbl)
 #        va2 = self.relu(self.reduction_cat(torch.cat([query_rgb, va2], dim=1)))
@@ -121,24 +124,33 @@ class IterativeWordEmbedCoResNet(WordEmbedCoResNet):
 #        va3, _ = self.coattend(va2, vb2, support_lbl)
 #        z = va2 + va3
 
+        # Upsample history masks for support set
+        history_masks_sprt = history_masks_sprt.view(-1, history_masks_sprt.shape[2],
+                                                     history_masks_sprt.shape[3],
+                                                     history_masks_sprt.shape[4])
+        history_masks_sprt=F.interpolate(history_masks_sprt, feature_size,mode='bilinear',align_corners=True)
+
+        # Decode predictions for support set and consutrct prototypes
+        outs = self.decode(zs, support_rgb, srgb_size, history_masks_sprt,
+                           feature_size, sprt_flag=True, prototypes=None)
+        pred = F.softmax(outs, dim=1)
+        protos = torch.sum(pred[:,1].unsqueeze(1) * support_rgb, dim=[2,3]) / torch.sum(pred[:, 1])
+        protos = protos.view(srgb_size[0], srgb_size[1], protos.shape[1], 1, 1)
+        protos = protos.mean(dim=1)
+        protos = protos.repeat(1, 1, zq.shape[2], zq.shape[3])
+
+        # upsample history_mask for decoding of query
         history_mask=F.interpolate(history_mask,feature_size,mode='bilinear',align_corners=True)
-        history_mask_rep = history_mask.unsqueeze(1).repeat(1, srgb_size[1], 1, 1, 1)
-        history_mask_rep = history_mask_rep.view(-1, history_mask.shape[1],
-                                                 history_mask.shape[2], history_mask.shape[3])
-        out=torch.cat([query_rgb_rep,z],dim=1)
-        out = self.layer55(out)
-        out_plus_history=torch.cat([out,history_mask_rep],dim=1)
-        out = out + self.residule1(out_plus_history)
-        out = out + self.residule2(out)
-        out = out + self.residule3(out)
 
-        global_feature=F.avg_pool2d(out,kernel_size=feature_size)
-        global_feature=self.layer6_0(global_feature)
-        global_feature=global_feature.expand(-1,-1,feature_size[0],feature_size[1])
-        out=torch.cat([global_feature,self.layer6_1(out),self.layer6_2(out),self.layer6_3(out),self.layer6_4(out)],dim=1)
-        out=self.layer7(out)
+        # Decode predictions for query based on prototypes
+        outq = self.decode(zq, query_rgb, srgb_size, history_mask,
+                           feature_size, sprt_flag=False, prototypes=protos)
 
-        out=self.layer9(out)
-        out = out.view(srgb_size[0], srgb_size[1], out.shape[1], out.shape[2], out.shape[3])
-        out = torch.sum(out, dim=1)
-        return out
+        if side_output:
+            gate_s = torch.cat((1-gate_s, gate_s), dim=1)
+            gate_q = torch.cat((1-gate_q, gate_q), dim=1)
+            extras = [gate_s, gate_q]
+        else:
+            extras = None
+        return outq, outs, extras
+
