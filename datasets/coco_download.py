@@ -49,7 +49,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
         '--dataset-dir', type=str,
-        default=os.path.join(os.sep, 'mnt', 'datasets', 'public', 'research', 'pascal'),
+        default=os.path.join(os.sep, 'mnt', 'datasets', 'public', 'research', 'COCO'),
         help='Path to the raw data')
     args = parser.parse_args()
 

@@ -20,3 +20,6 @@ cp embeddings_*coco.npy $DATA_DIR_COCO
 
 # copy fold data
 cp -r data_files/ $DATA_DIR
+
+# copy COCO classes
+cp coco_classes.txt $DATA_DIR_COCO
