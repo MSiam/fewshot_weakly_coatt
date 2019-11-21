@@ -25,5 +25,5 @@
 
 for fold in {0..3}
 do
-    python main.py -fold $fold -ckpt checkpoints_trainval/model_type\=iter_nwe_coatt\,fold\=$fold\,seed\=1337\,lr\=0.001\,split\=trainval\,embed_type\=word2vec\,dataset_name\=pascal/testing/ -model_type iter_nwe_coatt -film 0 -train 1 -split trainval -data_dir /usr/work/menna/VOCdevkit/VOC2012/ -test_multi_run 1 -embed_type word2vec -lr 0.001 -dataset_name pascal -bs 4 -num_workers 6 -num_epoch 201 -n_shots 5 -bs_val 8
+    python main.py -fold $fold -ckpt checkpoints_trainval/model_type\=iter_nwe_coatt\,fold\=$fold\,seed\=1337\,lr\=0.001\,split\=trainval\,embed_type\=word2vec\,dataset_name\=pascal/testing/ -model_type iter_nwe_coatt -film 0 -train 0 -split trainval -data_dir /usr/work/menna/VOCdevkit/VOC2012/ -test_multi_run 1 -embed_type word2vec -lr 0.001 -dataset_name pascal -bs 4 -num_workers 6 -num_epoch 201 -n_shots 5 -bs_val 8
 done
