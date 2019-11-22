@@ -216,6 +216,18 @@ class WordEmbedCoResNet(CoResNet):
 
         return uq, us, input2_mask, input1_mask
 
+    def calDist(self, fts, prototype, scaler=20):
+        """
+        Calculate the distance between features and prototypes
+        Args:
+            fts: input features
+                expect shape: N x C x H x W
+            prototype: prototype of one semantic class
+                expect shape: 1 x C
+        """
+        dist = F.cosine_similarity(fts, prototype[..., None, None], dim=1) * scaler
+        return dist
+
     def decode(self, att_summaries, visual_feats, size, history_mask,
                feature_size, sprt_flag=False, prototypes=None):
 
@@ -226,10 +238,6 @@ class WordEmbedCoResNet(CoResNet):
                                                att_summaries.shape[3])
 
             att_summaries = torch.mean(att_summaries, dim=1)
-
-        if prototypes is not None:
-            att_summaries = torch.cat([att_summaries, prototypes],dim=1)
-            att_summaries = self.reduction_protos(att_summaries)
 
         out = torch.cat([visual_feats, att_summaries],dim=1)
         out = self.layer55(out)
@@ -244,8 +252,16 @@ class WordEmbedCoResNet(CoResNet):
         global_feature=global_feature.expand(-1,-1,feature_size[0],feature_size[1])
         out=torch.cat([global_feature,self.layer6_1(out),self.layer6_2(out),self.layer6_3(out),self.layer6_4(out)],dim=1)
         out=self.layer7(out)
-        out=self.layer9(out)
-        return out
+        visual_feats = out
+
+        if prototypes is None:
+            out = self.layer9(out)
+        else:
+            out_bg = self.calDist(out, prototypes[:,0]).unsqueeze(1)
+            out_fg = self.calDist(out, prototypes[:,1]).unsqueeze(1)
+            out = torch.cat((out_bg, out_fg), dim=1)
+
+        return out, visual_feats
 
     def forward(self, query_rgb, support_rgb, support_lbl, history_mask,
                 history_masks_sprt, side_output=False):

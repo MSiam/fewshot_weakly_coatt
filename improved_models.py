@@ -99,7 +99,6 @@ class IterativeWordEmbedCoResNet(WordEmbedCoResNet):
         support_rgb = torch.cat([support_feat_layer2, support_rgb], dim=1)
         support_rgb = self.layer5(support_rgb)
 
-
         h,w=support_rgb.shape[-2:][0],support_rgb.shape[-2:][1]
         query_rgb_rep = query_rgb.unsqueeze(1).repeat(1, srgb_size[1], 1, 1, 1)
         sqry_size = query_rgb_rep.shape
@@ -115,15 +114,6 @@ class IterativeWordEmbedCoResNet(WordEmbedCoResNet):
         zq = va1 + va2
         zs = vb1 + vb2
 
-#        va2, vb2 = self.coattend(va1, vb1, support_lbl)
-#        va2 = self.relu(self.reduction_cat(torch.cat([query_rgb, va2], dim=1)))
-#        vb2 = self.relu(self.reduction_cat(torch.cat([support_rgb, vb2], dim=1)))
-
-#        va2 = va1 + va2
-#        vb2 = vb1 + vb2
-#        va3, _ = self.coattend(va2, vb2, support_lbl)
-#        z = va2 + va3
-
         # Upsample history masks for support set
         history_masks_sprt = history_masks_sprt.view(-1, history_masks_sprt.shape[2],
                                                      history_masks_sprt.shape[3],
@@ -131,20 +121,36 @@ class IterativeWordEmbedCoResNet(WordEmbedCoResNet):
         history_masks_sprt=F.interpolate(history_masks_sprt, feature_size,mode='bilinear',align_corners=True)
 
         # Decode predictions for support set and consutrct prototypes
-        outs = self.decode(zs, support_rgb, srgb_size, history_masks_sprt,
-                           feature_size, sprt_flag=True, prototypes=None)
-        pred = F.softmax(outs, dim=1)
-        protos = torch.sum(pred[:,1].unsqueeze(1) * support_rgb, dim=[2,3]) / torch.sum(pred[:, 1])
-        protos = protos.view(srgb_size[0], srgb_size[1], protos.shape[1], 1, 1)
-        protos = protos.mean(dim=1)
-        protos = protos.repeat(1, 1, zq.shape[2], zq.shape[3])
+        outs, visual_feats = self.decode(zs, support_rgb, srgb_size, history_masks_sprt,
+                                         feature_size, sprt_flag=True, prototypes=None)
+        pred_sprt_mask = outs.argmax(dim=1, keepdim=True)
+        binary_sprt_masks = [pred_sprt_mask == i for i in range(2)]
+        pred_sprt_mask = torch.stack(binary_sprt_masks, dim=1).float()
+        masked_feats = visual_feats.unsqueeze(1) * pred_sprt_mask
+        masked_feats = masked_feats.view(srgb_size[0], srgb_size[1],
+                                         masked_feats.shape[1],
+                                         masked_feats.shape[2],
+                                         masked_feats.shape[3],
+                                         masked_feats.shape[4])
+        pred_sprt_mask = pred_sprt_mask.view(srgb_size[0], srgb_size[1],
+                                             pred_sprt_mask.shape[1],
+                                             pred_sprt_mask.shape[2],
+                                             pred_sprt_mask.shape[3],
+                                             pred_sprt_mask.shape[4])
+        protos = torch.sum(masked_feats, dim=(1, 4, 5))
+        protos = protos / (pred_sprt_mask.sum((1, 4, 5)) + 1e-5)
 
         # upsample history_mask for decoding of query
         history_mask=F.interpolate(history_mask,feature_size,mode='bilinear',align_corners=True)
 
         # Decode predictions for query based on prototypes
-        outq = self.decode(zq, query_rgb, srgb_size, history_mask,
+        outq, _ = self.decode(zq, query_rgb, srgb_size, history_mask,
                            feature_size, sprt_flag=False, prototypes=protos)
+#        pred_mask = outq.argmax(dim=1, keepdim=True)
+#        binary_masks = [pred_mask == i for i in range(2)]
+#        pred_mask = torch.stack(binary_masks, dim=1).float()
+#        protos_qry = torch.sum(query_rgb.unsqueeze(1) * pred_mask, dim=(3, 4))
+#        protos_qry = protos_qry / (pred_mask.sum((3, 4)) + 1e-5)  # (1 + Wa) x C
 
         if side_output:
             gate_s = torch.cat((1-gate_s, gate_s), dim=1)
@@ -152,5 +158,5 @@ class IterativeWordEmbedCoResNet(WordEmbedCoResNet):
             extras = [gate_s, gate_q]
         else:
             extras = None
-        return outq, outs, extras
+        return outq, outs, extras#, protos, protos_qry
 
