@@ -1,0 +1,9 @@
+torch
+torchvision
+matplotlib
+cython
+pycocotools
+pandas
+tqdm
+opencv-python
+tensorboardX
