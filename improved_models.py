@@ -111,6 +111,8 @@ class IterativeWordEmbedCoResNet(WordEmbedCoResNet):
 
         va2, _ = self.coattend(va1, vb1, support_lbl, srgb_size)
         z = va1 + va2
+        z = z.view(srgb_size[0], srgb_size[1], z.shape[1], z.shape[2], z.shape[3])
+        z = torch.mean(z, dim=1)
 
 #        va2, vb2 = self.coattend(va1, vb1, support_lbl)
 #        va2 = self.relu(self.reduction_cat(torch.cat([query_rgb, va2], dim=1)))
@@ -122,12 +124,9 @@ class IterativeWordEmbedCoResNet(WordEmbedCoResNet):
 #        z = va2 + va3
 
         history_mask=F.interpolate(history_mask,feature_size,mode='bilinear',align_corners=True)
-        history_mask_rep = history_mask.unsqueeze(1).repeat(1, srgb_size[1], 1, 1, 1)
-        history_mask_rep = history_mask_rep.view(-1, history_mask.shape[1],
-                                                 history_mask.shape[2], history_mask.shape[3])
-        out=torch.cat([query_rgb_rep,z],dim=1)
+        out=torch.cat([query_rgb,z],dim=1)
         out = self.layer55(out)
-        out_plus_history=torch.cat([out,history_mask_rep],dim=1)
+        out_plus_history=torch.cat([out,history_mask],dim=1)
         out = out + self.residule1(out_plus_history)
         out = out + self.residule2(out)
         out = out + self.residule3(out)
@@ -139,6 +138,4 @@ class IterativeWordEmbedCoResNet(WordEmbedCoResNet):
         out=self.layer7(out)
 
         out=self.layer9(out)
-        out = out.view(srgb_size[0], srgb_size[1], out.shape[1], out.shape[2], out.shape[3])
-        out = torch.sum(out, dim=1)
         return out

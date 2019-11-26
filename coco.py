@@ -92,7 +92,6 @@ class COCOSeg(BaseDataset):
             for key_suffix in aux_attrib_val:
                 # one function may create multiple attributes, so we need suffix to distinguish them
                 sample[key_prefix + '_' + key_suffix] = aux_attrib_val[key_suffix]
-
         return sample
 
 class ToTensorNormalize(object):
@@ -326,7 +325,7 @@ def create_coco_fewshot(base_dir, split, input_size,
 
 if __name__ ==  "__main__":
     dataset, cat_ids = create_coco_fewshot('/home/msiam/Dataset/COCO/', 'trainval', input_size=(321, 321),
-                                          n_ways=1, n_shots=1, max_iters=1000, fold=1,
+                                          n_ways=1, n_shots=1, max_iters=30000, fold=2,
                                           prob=0.6, seed=1337)
     dataloader = data.DataLoader(dataset, batch_size=64, shuffle=False, num_workers=0,
                                 drop_last=False)
@@ -340,4 +339,4 @@ if __name__ ==  "__main__":
        # plt.figure(3); plt.imshow(qry_mask[0]);
        # plt.figure(4); plt.imshow(sprt_mask[0]);plt.show()
         print('Class # ', cls)
-        import pdb; pdb.set_trace()
+       # import pdb; pdb.set_trace()
