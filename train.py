@@ -185,7 +185,6 @@ def meta_train(options):
 
                 all_inter, all_union, all_predict = [0] * nfold_out_classes, [0] * nfold_out_classes, [0] * nfold_out_classes
                 for i_iter, batch in enumerate(valloader):
-                    print('Eva Iter ', i_iter)
                     query_rgb, query_mask, support_rgb, support_mask, history_mask, _, _, sample_class, index = batch
                     query_rgb = (query_rgb).cuda(0)
                     support_rgb = (support_rgb).cuda(0)
