@@ -53,7 +53,7 @@ def meta_train(options):
 
     # load resnet-50 preatrained parameter
     model = load_resnet_param(model, model_name=options.backbone, stop_layer='layer4')
-    model=nn.DataParallel(model,[0])
+    model = nn.DataParallel(model,[0])
 
     # disable the  gradients of not optomized layers
     if not options.ftune_backbone:
@@ -66,7 +66,8 @@ def meta_train(options):
     # trainset
     if options.dataset_name == 'pascal':
         dataset = Dataset_train(data_dir=data_dir, fold=options.fold, input_size=input_size, normalize_mean=IMG_MEAN,
-                                normalize_std=IMG_STD, prob=options.prob, seed=options.seed, n_shots=options.n_shots)
+                                normalize_std=IMG_STD, prob=options.prob, seed=options.seed, n_shots=options.n_shots,
+                                data_crop=options.data_aug)
     else:
         dataset, cat_ids = create_coco_fewshot(data_dir, 'train', input_size=input_size,
                                       n_ways=1, n_shots=1, max_iters=30000, fold=options.fold,
@@ -172,7 +173,8 @@ def meta_train(options):
                 if options.dataset_name == 'pascal':
                     valset = Dataset_val(data_dir=data_dir, fold=options.fold, input_size=input_size,
                                          normalize_mean=IMG_MEAN, normalize_std=IMG_STD,
-                                         split=options.split, seed=initial_seed+eva_iter, n_shots=options.n_shots)
+                                         split=options.split, seed=initial_seed+eva_iter, n_shots=options.n_shots,
+                                         data_aug=options.data_aug)
                 else:
                     valset, _ = create_coco_fewshot(data_dir, 'trainval', input_size=input_size,
                                                  n_ways=1, n_shots=1, max_iters=1000, fold=options.fold,

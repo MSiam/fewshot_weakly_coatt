@@ -11,17 +11,15 @@ import numpy as np
 from torch.utils.data import DataLoader
 import time
 
-
-
 class Dataset(object):
-
-
     def __init__(self, data_dir, fold, input_size=[321, 321] , normalize_mean=[0, 0, 0],
-                 normalize_std=[1, 1, 1], prob=0.7, seed=None, n_shots=1):
+                 normalize_std=[1, 1, 1], prob=0.7, seed=None, n_shots=1, data_crop=True):
         # -------------------load data list,[class,video_name]-------------------
         self.data_dir = data_dir
         self.rand = random.Random()
         self.n_shots = n_shots
+        self.data_crop = data_crop
+
         if seed is not None:
             self.rand.seed(seed)
         self.new_exist_class_list = self.get_new_exist_class_dict(fold=fold)
@@ -85,7 +83,11 @@ class Dataset(object):
 
         input_size = self.input_size[0]
         # random scale and crop for support
-        scaled_size = int(self.rand.uniform(1,1.5)*input_size)
+        if self.data_crop:
+            scaled_size = int(self.rand.uniform(1,1.5)*input_size)
+        else:
+            scaled_size = input_size
+
         scale_transform_mask = torchvision.transforms.Resize([scaled_size, scaled_size], interpolation=Image.NEAREST)
         scale_transform_rgb = torchvision.transforms.Resize([scaled_size, scaled_size], interpolation=Image.BILINEAR)
         flip_flag = self.rand.random()
@@ -111,12 +113,12 @@ class Dataset(object):
                               Image.open(
                                   os.path.join(self.data_dir, 'Binary_map_aug', 'train', str(sample_class),
                                                support_name + '.png')))))
-
-            margin_h = self.rand.randint(0, scaled_size - input_size)
-            margin_w = self.rand.randint(0, scaled_size - input_size)
-            support_rgb = support_rgb[:, margin_h:margin_h + input_size, margin_w:margin_w + input_size]
-            support_original = support_original[margin_h:margin_h + input_size, margin_w:margin_w + input_size, :]
-            support_mask = support_mask[:, margin_h:margin_h + input_size, margin_w:margin_w + input_size]
+            if self.data_crop:
+                margin_h = self.rand.randint(0, scaled_size - input_size)
+                margin_w = self.rand.randint(0, scaled_size - input_size)
+                support_rgb = support_rgb[:, margin_h:margin_h + input_size, margin_w:margin_w + input_size]
+                support_original = support_original[margin_h:margin_h + input_size, margin_w:margin_w + input_size, :]
+                support_mask = support_mask[:, margin_h:margin_h + input_size, margin_w:margin_w + input_size]
 
             support_rgbs.append(support_rgb)
             support_masks.append(support_mask)
@@ -150,13 +152,12 @@ class Dataset(object):
                           Image.open(
                               os.path.join(self.data_dir, 'Binary_map_aug', 'train', str(sample_class),
                                            query_name + '.png')))))
-
-        margin_h = self.rand.randint(0, scaled_size - input_size)
-        margin_w = self.rand.randint(0, scaled_size - input_size)
-
-        query_rgb = query_rgb[:, margin_h:margin_h + input_size, margin_w:margin_w + input_size]
-        qry_original = qry_original[margin_h:margin_h + input_size, margin_w:margin_w + input_size, :]
-        query_mask = query_mask[:, margin_h:margin_h + input_size, margin_w:margin_w + input_size]
+        if self.data_crop:
+            margin_h = self.rand.randint(0, scaled_size - input_size)
+            margin_w = self.rand.randint(0, scaled_size - input_size)
+            query_rgb = query_rgb[:, margin_h:margin_h + input_size, margin_w:margin_w + input_size]
+            qry_original = qry_original[margin_h:margin_h + input_size, margin_w:margin_w + input_size, :]
+            query_mask = query_mask[:, margin_h:margin_h + input_size, margin_w:margin_w + input_size]
 
         if self.history_mask_list[index] is None:
 

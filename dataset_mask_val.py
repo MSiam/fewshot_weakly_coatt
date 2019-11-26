@@ -12,11 +12,12 @@ import glob
 
 class Dataset(object):
     def __init__(self, data_dir, fold, input_size=[321, 321], normalize_mean=[0, 0, 0],
-                 normalize_std=[1, 1, 1], seed=None, split='val', n_shots=1):
+                 normalize_std=[1, 1, 1], seed=None, split='val', n_shots=1, data_aug=True):
 
         self.data_dir = data_dir
         self.input_size = input_size
         self.n_shots = n_shots
+        self.data_aug = data_aug
 
         self.rand = random.Random()
         self.split = split
@@ -106,7 +107,7 @@ class Dataset(object):
 
         input_size = self.input_size[0]
         # random scale and crop for support only during validation not testing
-        if self.split == 'test':
+        if self.split == 'test' or not self.data_aug:
             scaled_size = input_size
         else:
             scaled_size = int(self.rand.uniform(1,1.5)*input_size)
@@ -114,7 +115,7 @@ class Dataset(object):
         scale_transform_mask = torchvision.transforms.Resize([scaled_size, scaled_size], interpolation=Image.NEAREST)
         scale_transform_rgb = torchvision.transforms.Resize([scaled_size, scaled_size], interpolation=Image.BILINEAR)
 
-        if self.split == 'test': # No flipping during testing
+        if self.split == 'test' or not self.data_aug: # No flipping during testing
             flip_flag = 0
         else:
             flip_flag = self.rand.random()
@@ -142,7 +143,7 @@ class Dataset(object):
                               Image.open(
                                   os.path.join(self.data_dir, 'Binary_map_aug', 'val', str(sample_class),
                                                support_name + '.png')))))
-            if self.split != 'test': # No margins either during testing
+            if self.split != 'test' and self.data_aug: # No margins either during testing
                 support_rgb = support_rgb[:, margin_h:margin_h + input_size, margin_w:margin_w + input_size]
                 support_mask = support_mask[:, margin_h:margin_h + input_size, margin_w:margin_w + input_size]
                 support_original = support_original[margin_h:margin_h + input_size, margin_w:margin_w + input_size, :]
@@ -179,7 +180,7 @@ class Dataset(object):
                           Image.open(
                               os.path.join(self.data_dir, 'Binary_map_aug', 'val', str(sample_class),
                                            query_name + '.png')))))
-        if self.split != 'test':
+        if self.split != 'test' and self.data_aug:
             margin_h = self.rand.randint(0, scaled_size - input_size)
             margin_w = self.rand.randint(0, scaled_size - input_size)
 

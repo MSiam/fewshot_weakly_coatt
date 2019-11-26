@@ -157,12 +157,17 @@ parser.add_argument('-ftune_backbone',
                     default=0,
                     help='option to finetune the backbone or not')
 
+parser.add_argument('-data_aug',
+                    type=int,
+                    default=0,
+                    help='option to augment data or not')
+
 def main(argv=None):
     options = parser.parse_args()
     if options.split not in ['trainval', 'val', 'test']:
         print('Error in split')
 
-    options = Namespace(load_and_save_params(vars(options), options.exp_dir))
+#    options = Namespace(load_and_save_params(vars(options), options.exp_dir))
 
     # To ensure reproducability
     if options.reproducability:
