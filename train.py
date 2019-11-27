@@ -146,8 +146,7 @@ def meta_train(options):
             loss.backward()
             optimizer.step()
 
-            tqdm_gen.set_description('e:%d loss = %.4f-:%.4f' % (
-            epoch, loss.item(),highest_iou))
+            tqdm_gen.set_description('e:%d loss = %.4f-' % (epoch, loss.item()))
 
             #save training loss
             tempory_loss += loss.item()
