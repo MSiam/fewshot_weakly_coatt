@@ -162,6 +162,11 @@ parser.add_argument('-data_aug',
                     default=0,
                     help='option to augment data or not')
 
+parser.add_argument('-niterations',
+                    type=int,
+                    default=-1,
+                    help='#iterations for episodic training when no epochs are used')
+
 def main(argv=None):
     options = parser.parse_args()
     if options.split not in ['trainval', 'val', 'test']:

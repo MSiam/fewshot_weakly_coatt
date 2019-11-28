@@ -13,7 +13,8 @@ import time
 
 class Dataset(object):
     def __init__(self, data_dir, fold, input_size=[321, 321] , normalize_mean=[0, 0, 0],
-                 normalize_std=[1, 1, 1], prob=0.7, seed=None, n_shots=1, data_crop=True):
+                 normalize_std=[1, 1, 1], prob=0.7, seed=None, n_shots=1, data_crop=True,
+                 niterations=-1):
         # -------------------load data list,[class,video_name]-------------------
         self.data_dir = data_dir
         self.rand = random.Random()
@@ -28,6 +29,10 @@ class Dataset(object):
         self.input_size = input_size
         self.history_mask_list = [None] * self.__len__()
         self.prob=prob#probability of sampling history masks=0
+        if niterations != -1:
+            self.niterations = niterations
+        else:
+            self.niterations = len(self.new_exist_class_list)
 
     def get_new_exist_class_dict(self, fold):
         new_exist_class_list = []
@@ -69,8 +74,8 @@ class Dataset(object):
 
     def __getitem__(self, index):
         # give an query index,sample a target class first
-        query_name = self.new_exist_class_list[index][0]
-        sample_class = self.new_exist_class_list[index][1]  # random sample a class in this img
+        query_name = self.new_exist_class_list[index%len(self.new_exist_class_list)][0]
+        sample_class = self.new_exist_class_list[index%len(self.new_exist_class_list)][1]  # random sample a class in this img
 
         support_img_list = self.binary_pair_list[sample_class]  # all img that contain the sample_class
         support_names= []
@@ -179,6 +184,6 @@ class Dataset(object):
             return img
 
     def __len__(self):
-        return len(self.new_exist_class_list)
+        return self.niterations
 
 
