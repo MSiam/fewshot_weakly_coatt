@@ -27,12 +27,12 @@ class Dataset(object):
         self.initiaize_transformation(normalize_mean, normalize_std, input_size)
         self.binary_pair_list = self.get_binary_pair_list()
         self.input_size = input_size
-        self.history_mask_list = [None] * self.__len__()
         self.prob=prob#probability of sampling history masks=0
         if niterations != -1:
             self.niterations = niterations
         else:
             self.niterations = len(self.new_exist_class_list)
+        self.history_mask_list = [None] * self.__len__()
 
     def get_new_exist_class_dict(self, fold):
         new_exist_class_list = []
