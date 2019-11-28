@@ -2,9 +2,9 @@
 #SBATCH --array=1-4
 #SBATCH --nodes=1
 #SBATCH --job-name=fewshot_webly
-#SBATCH --gres=gpu:1
+#SBATCH --gres=gpu:0
 #SBATCH --mem=5000M
-#SBATCH --time=2-10:00 #d-hh:mm
+#SBATCH --time=0-23:00 #d-hh:mm
 #SBATCH --output=outputs/webly%A%a.out
 #SBATCH --error=errors/webly%A%a.err
 

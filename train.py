@@ -164,10 +164,9 @@ def meta_train(options):
         training_loss = float(loss_list[-1]) if len(loss_list) > 0 else np.nan
         snapshot_manager.register(iteration=epoch,
                                   training_loss=training_loss,
-                                  validation_loss=best_iou,
+                                  validation_loss=1.0,
                                   model=model, optimizer=optimizer)
         # Log epoch metrics
-        tensorboard.add_scalar('validation/best_iou', best_iou, epoch)
         tensorboard.add_scalar('training/loss', training_loss, epoch)
         tensorboard.add_scalar('training/learning_rate', scheduler.get_lr(), epoch)
 
