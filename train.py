@@ -34,6 +34,7 @@ def meta_train(options):
     num_class = 2
     if options.niterations != -1:
         num_epoch = 1
+        val_every = 10000
     else:
         num_epoch = options.num_epoch
 
@@ -71,7 +72,7 @@ def meta_train(options):
     if options.dataset_name == 'pascal':
         dataset = Dataset_train(data_dir=data_dir, fold=options.fold, input_size=input_size, normalize_mean=IMG_MEAN,
                                 normalize_std=IMG_STD, prob=options.prob, seed=options.seed, n_shots=options.n_shots,
-                                data_crop=options.data_aug, niterations=options.niterations)
+                                data_crop=1, niterations=options.niterations)
     else:
         dataset, cat_ids = create_coco_fewshot(data_dir, 'train', input_size=input_size,
                                       n_ways=1, n_shots=1, max_iters=30000, fold=options.fold,
@@ -166,104 +167,105 @@ def meta_train(options):
                 plot_loss(checkpoint_dir, loss_list, save_pred_every)
                 np.savetxt(os.path.join(checkpoint_dir, 'loss_history.txt'), np.array(loss_list))
                 tempory_loss = 0
-#        # ======================evaluate now==================
-#        with torch.no_grad():
-#            print ('----Evaluation----')
-#            model = model.eval()
-#
-#            best_iou = 0
-#            initial_seed = options.seed #+ epoch
-#            for eva_iter in range(options.iter_time):
-#                if options.dataset_name == 'pascal':
-#                    valset = Dataset_val(data_dir=data_dir, fold=options.fold, input_size=input_size,
-#                                         normalize_mean=IMG_MEAN, normalize_std=IMG_STD,
-#                                         split=options.split, seed=initial_seed+eva_iter, n_shots=options.n_shots,
-#                                         data_aug=options.data_aug)
-#                else:
-#                    valset, _ = create_coco_fewshot(data_dir, 'trainval', input_size=input_size,
-#                                                 n_ways=1, n_shots=1, max_iters=1000, fold=options.fold,
-#                                                 prob=options.prob, seed=initial_seed+eva_iter)
-#
-#                valset.history_mask_list=[None] * 1000
-#                valloader = data.DataLoader(valset, batch_size=options.bs_val, shuffle=False,
-#                                            num_workers=options.num_workers,
-#                                            drop_last=False)
-#
-#                all_inter, all_union, all_predict = [0] * nfold_out_classes, [0] * nfold_out_classes, [0] * nfold_out_classes
-#                for i_iter, batch in enumerate(valloader):
-#                    query_rgb, query_mask, support_rgb, support_mask, history_mask, _, _, sample_class, index = batch
-#                    query_rgb = (query_rgb).cuda(0)
-#                    support_rgb = (support_rgb).cuda(0)
-#                    support_mask = (support_mask).cuda(0)
-#                    query_mask = (query_mask).cuda(0).long()  # change formation for crossentropy use
-#
-#                    query_mask = query_mask[:, 0, :, :]  # remove the second dim,change formation for crossentropy use
-#                    history_mask = (history_mask).cuda(0)
-#
-#                    if options.model_type == 'vanilla':
-#                        pred = model(query_rgb, support_rgb, support_mask,history_mask)
-#                    else:
-#                        pred = model(query_rgb, support_rgb, sample_class,history_mask)
-#                    pred_softmax = F.softmax(pred, dim=1).data.cpu()
-#
-#                    # update history mask
-#                    for j in range(support_mask.shape[0]):
-#                        sub_index = index[j]
-#                        valset.history_mask_list[sub_index] = pred_softmax[j]
-#
-#                    pred = nn.functional.interpolate(pred, size=input_size, mode='bilinear',
-#                                                         align_corners=True)  #upsample  # upsample
-#
-#                    _, pred_label = torch.max(pred, 1)
-#                    inter_list, union_list, _, num_predict_list = get_iou_v1(query_mask, pred_label)
-#                    for j in range(query_mask.shape[0]):#batch size
-#                        all_inter[mapping[int(sample_class[j])]] += inter_list[j]
-#                        all_union[mapping[int(sample_class[j])]] += union_list[j]
-#
-#                IOU = []
-#                for j in range(nfold_out_classes):
-#                    if all_union[j] != 0:
-#                        IOU.append(all_inter[j] / all_union[j])
-#
-#                mean_iou = np.mean(IOU)
-#                print('IOU:%.4f' % (mean_iou))
-#                if mean_iou > best_iou:
-#                    best_iou = mean_iou
-#                else:
-#                    break
-#
-#            iou_list.append(best_iou)
-#            plot_iou(checkpoint_dir, iou_list)
-#            np.savetxt(os.path.join(checkpoint_dir, 'iou_history.txt'), np.array(iou_list))
-#
-#            if best_iou>highest_iou:
-#                highest_iou = best_iou
-#                best_epoch = epoch
-        model = model.eval()
-        torch.save(model.cpu().state_dict(), osp.join(checkpoint_dir, 'model', 'best.pth'))
-        model = model.train()
-        print('A better model is saved')
-#
-#            print('IOU for this epoch: %.4f' % (best_iou))
-#
-#            model = model.train()
-#            model.cuda()
 
-        epoch_time = time.time() - begin_time
-#        print('best epoch:%d ,iout:%.4f' % (best_epoch, highest_iou))
-        print('This epoch takes:', epoch_time, 'second')
-        print('still need hour:%.4f' % ((num_epoch - epoch) * epoch_time / 3600))
+            # ======================evaluate now==================
+            if i_iter % val_every == 0:
+                with torch.no_grad():
+                    print ('----Evaluation----')
+                    model = model.eval()
 
-        # Save epoch checkpoint
-        training_loss = float(loss_list[-1]) if len(loss_list) > 0 else np.nan
-        snapshot_manager.register(iteration=epoch,
-                                  training_loss=training_loss,
-                                  validation_loss=0.0,
-                                  model=model, optimizer=optimizer)
-        # Log epoch metrics
-#        tensorboard.add_scalar('validation/best_iou', best_iou, epoch)
-        tensorboard.add_scalar('training/loss', training_loss, epoch)
-        tensorboard.add_scalar('training/learning_rate', scheduler.get_lr(), epoch)
+                    best_iou = 0
+                    initial_seed = options.seed #+ epoch
+                    for eva_iter in range(options.iter_time):
+                        if options.dataset_name == 'pascal':
+                            valset = Dataset_val(data_dir=data_dir, fold=options.fold, input_size=input_size,
+                                                 normalize_mean=IMG_MEAN, normalize_std=IMG_STD,
+                                                 split=options.split, seed=initial_seed+eva_iter, n_shots=options.n_shots,
+                                                 data_aug=options.data_aug)
+                        else:
+                            valset, _ = create_coco_fewshot(data_dir, 'trainval', input_size=input_size,
+                                                         n_ways=1, n_shots=1, max_iters=1000, fold=options.fold,
+                                                         prob=options.prob, seed=initial_seed+eva_iter)
+
+                        valset.history_mask_list=[None] * 1000
+                        valloader = data.DataLoader(valset, batch_size=options.bs_val, shuffle=False,
+                                                    num_workers=options.num_workers,
+                                                    drop_last=False)
+
+                        all_inter, all_union, all_predict = [0] * nfold_out_classes, [0] * nfold_out_classes, [0] * nfold_out_classes
+                        for i_iter, batch in enumerate(valloader):
+                            query_rgb, query_mask, support_rgb, support_mask, history_mask, _, _, sample_class, index = batch
+                            query_rgb = (query_rgb).cuda(0)
+                            support_rgb = (support_rgb).cuda(0)
+                            support_mask = (support_mask).cuda(0)
+                            query_mask = (query_mask).cuda(0).long()  # change formation for crossentropy use
+
+                            query_mask = query_mask[:, 0, :, :]  # remove the second dim,change formation for crossentropy use
+                            history_mask = (history_mask).cuda(0)
+
+                            if options.model_type == 'vanilla':
+                                pred = model(query_rgb, support_rgb, support_mask,history_mask)
+                            else:
+                                pred = model(query_rgb, support_rgb, sample_class,history_mask)
+                            pred_softmax = F.softmax(pred, dim=1).data.cpu()
+
+                            # update history mask
+                            for j in range(support_mask.shape[0]):
+                                sub_index = index[j]
+                                valset.history_mask_list[sub_index] = pred_softmax[j]
+
+                            pred = nn.functional.interpolate(pred, size=input_size, mode='bilinear',
+                                                                 align_corners=True)  #upsample  # upsample
+
+                            _, pred_label = torch.max(pred, 1)
+                            inter_list, union_list, _, num_predict_list = get_iou_v1(query_mask, pred_label)
+                            for j in range(query_mask.shape[0]):#batch size
+                                all_inter[mapping[int(sample_class[j])]] += inter_list[j]
+                                all_union[mapping[int(sample_class[j])]] += union_list[j]
+
+                        IOU = []
+                        for j in range(nfold_out_classes):
+                            if all_union[j] != 0:
+                                IOU.append(all_inter[j] / all_union[j])
+
+                        mean_iou = np.mean(IOU)
+                        print('IOU:%.4f' % (mean_iou))
+                        if mean_iou > best_iou:
+                            best_iou = mean_iou
+                        else:
+                            break
+
+                    iou_list.append(best_iou)
+                    plot_iou(checkpoint_dir, iou_list)
+                    np.savetxt(os.path.join(checkpoint_dir, 'iou_history.txt'), np.array(iou_list))
+
+                    if best_iou>highest_iou:
+                        highest_iou = best_iou
+                        best_epoch = i_iter
+                        model = model.eval()
+                        torch.save(model.cpu().state_dict(), osp.join(checkpoint_dir, 'model', 'best.pth'))
+                        model = model.train()
+                        print('A better model is saved')
+        
+                    print('IOU for this epoch: %.4f' % (best_iou))
+                    model = model.train()
+                    model.cuda()
+
+            epoch_time = time.time() - begin_time
+            print('best epoch:%d ,iout:%.4f' % (best_epoch, highest_iou))
+            print('This epoch takes:', epoch_time, 'second')
+            print('still need hour:%.4f' % ((num_epoch - epoch) * epoch_time / 3600))
+
+            # Save epoch checkpoint
+            training_loss = float(loss_list[-1]) if len(loss_list) > 0 else np.nan
+            snapshot_manager.register(iteration=i_iter,
+                                      training_loss=training_loss,
+                                      validation_loss=best_iou,
+                                      model=model, optimizer=optimizer)
+            # Log epoch metrics
+            tensorboard.add_scalar('validation/best_iou', best_iou, epoch)
+            tensorboard.add_scalar('training/loss', training_loss, epoch)
+            tensorboard.add_scalar('training/learning_rate', scheduler.get_lr(), epoch)
 
 #        test_miou = test_multi_runs(options, mode='last', num_runs=1)
 #        tensorboard.add_scalar('test/mean_iou', test_miou, epoch)
