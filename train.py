@@ -177,6 +177,5 @@ def meta_train(options):
     
     model = model.eval()
     torch.save(model.cpu().state_dict(), osp.join(checkpoint_dir, 'model', 'best.pth'))
-    model = model.train()
     print('A model is saved')
     tensorboard.close()
