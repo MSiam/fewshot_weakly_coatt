@@ -22,9 +22,9 @@ from coco import create_coco_fewshot
 from test_multi_runs import test_multi_runs
 
 def meta_train(options):
-    data_dir = options.data_dir
 
-    #set gpus
+    #Set Variables used in experiment
+    data_dir = options.data_dir
     gpu_list = [int(x) for x in options.gpu.split(',')]
     os.environ['CUDA_DEVICE_ORDER'] = 'PCI_BUS_ID'
     os.environ['CUDA_VISIBLE_DEVICES'] = options.gpu
@@ -39,6 +39,8 @@ def meta_train(options):
     batch_size = options.bs
     weight_decay = 0.0005
     momentum = 0.9
+
+    # Set Vars used for evalution mIoU
     if options.dataset_name == 'pascal':
         nfold_classes = 5
         nfold_out_classes = 15
@@ -62,8 +64,7 @@ def meta_train(options):
     checkpoint_dir = os.path.join(options.exp_dir, options.ckpt, 'fo=%d'% options.fold)
     check_dir(checkpoint_dir)
 
-    # loading data
-    # trainset
+    # Create training dataset
     if options.dataset_name == 'pascal':
         dataset = Dataset_train(data_dir=data_dir, fold=options.fold, input_size=input_size, normalize_mean=IMG_MEAN,
                                 normalize_std=IMG_STD, prob=options.prob, seed=options.seed, n_shots=options.n_shots,
@@ -74,12 +75,16 @@ def meta_train(options):
                                       prob=options.prob, seed=options.seed)
 
     trainloader = data.DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=options.num_workers)
+
+    # when to log loss for tensorboard
     save_pred_every = len(trainloader) - 1
 
     # create optimizer
     optimizer = optim.SGD([{'params': get_10x_lr_params(model, options.model_type, options.film, options.ftune_backbone),
                             'lr': 10 * learning_rate}],
                             lr=learning_rate, momentum=momentum, weight_decay=weight_decay)
+
+    # Load Snapshot
     snapshot_manager = SnapshotManager(snapshot_dir=os.path.join(checkpoint_dir, 'snapshot'),
                                        logging_frequency=1, snapshot_frequency=1)
     last_epoch = snapshot_manager.restore(model, optimizer)
@@ -101,6 +106,7 @@ def meta_train(options):
         else:
             mapping[c+1] = it
 
+    # Set validation metrics and restore from snapshot
     loss_list = [] # track training loss
     iou_list = [] # track validaiton iou
     highest_iou = 0
@@ -110,23 +116,16 @@ def meta_train(options):
         iou_list = list(snapshot_manager.losses['validation'].values())
         highest_iou = np.max(iou_list)
 
-    model.cuda()
-    model = model.train()
-
-    # initialize vars for summaries and logging
-    tensorboard = SummaryWriter(log_dir = os.path.join(checkpoint_dir, 'tensorboard'))
-    tempory_loss = 0  # accumulated loss
-    best_epoch=0
-    snapshot_manager.enable_time_tracking()
-
     for epoch in range(last_epoch+1, num_epoch):
         print('Running epoch ', epoch, ' from ', num_epoch)
         print('Epoch:', epoch,'LR:', scheduler.get_lr())
         begin_time = time.time()
         tqdm_gen = tqdm.tqdm(trainloader)
+
         for i_iter, batch in enumerate(tqdm_gen):
             query_rgb, query_mask,support_rgb, support_mask,history_mask, _, _, sample_class,index= batch
 
+            # Set all input vars to cuda
             query_rgb = (query_rgb).cuda(0)
             support_rgb = (support_rgb).cuda(0)
             support_mask = (support_mask).cuda(0)
@@ -134,6 +133,7 @@ def meta_train(options):
             query_mask = query_mask[:, 0, :, :]  # remove the second dim,change formation for crossentropy use
             history_mask=(history_mask).cuda(0)
 
+            # Inference
             optimizer.zero_grad()
             if options.model_type == 'vanilla':
                 pred=model(query_rgb, support_rgb, support_mask,history_mask)
@@ -146,14 +146,15 @@ def meta_train(options):
                 sub_index=index[j]
                 dataset.history_mask_list[sub_index]=pred_softmax[j]
 
+            # Upsample prediction
             pred = nn.functional.interpolate(pred,size=input_size, mode='bilinear',align_corners=True)#upsample
 
+            # Compute loss and backpropagate
             loss = loss_calc_v1(pred, query_mask, 0)
             loss.backward()
             optimizer.step()
 
-            tqdm_gen.set_description('e:%d loss = %.4f-:%.4f' % (
-            epoch, loss.item(),highest_iou))
+            tqdm_gen.set_description('e:%d loss = %.4f-' % (epoch, loss.item()))
 
             #save training loss
             tempory_loss += loss.item()
@@ -162,108 +163,115 @@ def meta_train(options):
                 plot_loss(checkpoint_dir, loss_list, save_pred_every)
                 np.savetxt(os.path.join(checkpoint_dir, 'loss_history.txt'), np.array(loss_list))
                 tempory_loss = 0
-        # ======================evaluate now==================
-        with torch.no_grad():
-            print ('----Evaluation----')
-            model = model.eval()
 
-            best_iou = 0
-            initial_seed = options.seed #+ epoch
-            for eva_iter in range(options.iter_time):
-                if options.dataset_name == 'pascal':
-                    valset = Dataset_val(data_dir=data_dir, fold=options.fold, input_size=input_size,
-                                         normalize_mean=IMG_MEAN, normalize_std=IMG_STD,
-                                         split=options.split, seed=initial_seed+eva_iter, n_shots=options.n_shots,
-                                         data_aug=options.data_aug)
-                else:
-                    valset, _ = create_coco_fewshot(data_dir, 'trainval', input_size=input_size,
-                                                 n_ways=1, n_shots=1, max_iters=1000, fold=options.fold,
-                                                 prob=options.prob, seed=initial_seed+eva_iter)
-
-                valset.history_mask_list=[None] * 1000
-                valloader = data.DataLoader(valset, batch_size=options.bs_val, shuffle=False,
-                                            num_workers=options.num_workers,
-                                            drop_last=False)
-
-                all_inter, all_union, all_predict = [0] * nfold_out_classes, [0] * nfold_out_classes, [0] * nfold_out_classes
-                for i_iter, batch in enumerate(valloader):
-                    query_rgb, query_mask, support_rgb, support_mask, history_mask, _, _, sample_class, index = batch
-                    query_rgb = (query_rgb).cuda(0)
-                    support_rgb = (support_rgb).cuda(0)
-                    support_mask = (support_mask).cuda(0)
-                    query_mask = (query_mask).cuda(0).long()  # change formation for crossentropy use
-
-                    query_mask = query_mask[:, 0, :, :]  # remove the second dim,change formation for crossentropy use
-                    history_mask = (history_mask).cuda(0)
-
-                    if options.model_type == 'vanilla':
-                        pred = model(query_rgb, support_rgb, support_mask,history_mask)
-                    else:
-                        pred = model(query_rgb, support_rgb, sample_class,history_mask)
-                    pred_softmax = F.softmax(pred, dim=1).data.cpu()
-
-                    # update history mask
-                    for j in range(support_mask.shape[0]):
-                        sub_index = index[j]
-                        valset.history_mask_list[sub_index] = pred_softmax[j]
-
-                    pred = nn.functional.interpolate(pred, size=input_size, mode='bilinear',
-                                                         align_corners=True)  #upsample  # upsample
-
-                    _, pred_label = torch.max(pred, 1)
-                    inter_list, union_list, _, num_predict_list = get_iou_v1(query_mask, pred_label)
-                    for j in range(query_mask.shape[0]):#batch size
-                        all_inter[mapping[int(sample_class[j])]] += inter_list[j]
-                        all_union[mapping[int(sample_class[j])]] += union_list[j]
-
-                IOU = []
-                for j in range(nfold_out_classes):
-                    if all_union[j] != 0:
-                        IOU.append(all_inter[j] / all_union[j])
-
-                mean_iou = np.mean(IOU)
-                print('IOU:%.4f' % (mean_iou))
-                if mean_iou > best_iou:
-                    best_iou = mean_iou
-                else:
-                    break
-
-            iou_list.append(best_iou)
-            plot_iou(checkpoint_dir, iou_list)
-            np.savetxt(os.path.join(checkpoint_dir, 'iou_history.txt'), np.array(iou_list))
-
-            if best_iou>highest_iou:
-                highest_iou = best_iou
+        if not options.noval: # Only when validation scheme is allowed
+            # ======================evaluate now==================
+            with torch.no_grad():
+                print ('----Evaluation----')
                 model = model.eval()
-                torch.save(model.cpu().state_dict(), osp.join(checkpoint_dir, 'model', 'best.pth'))
+
+                best_iou = 0
+                initial_seed = options.seed #+ epoch
+                for eva_iter in range(options.iter_time):
+                    if options.dataset_name == 'pascal':
+                        valset = Dataset_val(data_dir=data_dir, fold=options.fold, input_size=input_size,
+                                             normalize_mean=IMG_MEAN, normalize_std=IMG_STD,
+                                             split=options.split, seed=initial_seed+eva_iter, n_shots=options.n_shots,
+                                             data_aug=options.data_aug)
+                    else:
+                        valset, _ = create_coco_fewshot(data_dir, 'trainval', input_size=input_size,
+                                                     n_ways=1, n_shots=1, max_iters=1000, fold=options.fold,
+                                                     prob=options.prob, seed=initial_seed+eva_iter)
+
+                    valset.history_mask_list=[None] * 1000
+                    valloader = data.DataLoader(valset, batch_size=options.bs_val, shuffle=False,
+                                                num_workers=options.num_workers,
+                                                drop_last=False)
+
+                    all_inter, all_union, all_predict = [0] * nfold_out_classes, [0] * nfold_out_classes, [0] * nfold_out_classes
+                    for i_iter, batch in enumerate(valloader):
+                        query_rgb, query_mask, support_rgb, support_mask, history_mask, _, _, sample_class, index = batch
+                        query_rgb = (query_rgb).cuda(0)
+                        support_rgb = (support_rgb).cuda(0)
+                        support_mask = (support_mask).cuda(0)
+                        query_mask = (query_mask).cuda(0).long()  # change formation for crossentropy use
+
+                        query_mask = query_mask[:, 0, :, :]  # remove the second dim,change formation for crossentropy use
+                        history_mask = (history_mask).cuda(0)
+
+                        if options.model_type == 'vanilla':
+                            pred = model(query_rgb, support_rgb, support_mask,history_mask)
+                        else:
+                            pred = model(query_rgb, support_rgb, sample_class,history_mask)
+                        pred_softmax = F.softmax(pred, dim=1).data.cpu()
+
+                        # update history mask
+                        for j in range(support_mask.shape[0]):
+                            sub_index = index[j]
+                            valset.history_mask_list[sub_index] = pred_softmax[j]
+
+                        pred = nn.functional.interpolate(pred, size=input_size, mode='bilinear',
+                                                             align_corners=True)  #upsample  # upsample
+
+                        _, pred_label = torch.max(pred, 1)
+                        inter_list, union_list, _, num_predict_list = get_iou_v1(query_mask, pred_label)
+                        for j in range(query_mask.shape[0]):#batch size
+                            all_inter[mapping[int(sample_class[j])]] += inter_list[j]
+                            all_union[mapping[int(sample_class[j])]] += union_list[j]
+
+                    IOU = []
+                    for j in range(nfold_out_classes):
+                        if all_union[j] != 0:
+                            IOU.append(all_inter[j] / all_union[j])
+
+                    mean_iou = np.mean(IOU)
+                    print('IOU:%.4f' % (mean_iou))
+                    if mean_iou > best_iou:
+                        best_iou = mean_iou
+                    else:
+                        break
+
+                iou_list.append(best_iou)
+                plot_iou(checkpoint_dir, iou_list)
+                np.savetxt(os.path.join(checkpoint_dir, 'iou_history.txt'), np.array(iou_list))
+
+                if best_iou>highest_iou:
+                    highest_iou = best_iou
+                    model = model.eval()
+                    torch.save(model.cpu().state_dict(), osp.join(checkpoint_dir, 'model', 'best.pth'))
+                    model = model.train()
+                    best_epoch = epoch
+                    print('A better model is saved')
+
+                print('IOU for this epoch: %.4f' % (best_iou))
+
                 model = model.train()
-                best_epoch = epoch
-                print('A better model is saved')
+                model.cuda()
 
-            print('IOU for this epoch: %.4f' % (best_iou))
-
-            model = model.train()
-            model.cuda()
-
+        # Measure time for one epoch
         epoch_time = time.time() - begin_time
-        print('best epoch:%d ,iout:%.4f' % (best_epoch, highest_iou))
         print('This epoch takes:', epoch_time, 'second')
         print('still need hour:%.4f' % ((num_epoch - epoch) * epoch_time / 3600))
 
-        # Save epoch checkpoint
+        # Save epoch snapshot
         training_loss = float(loss_list[-1]) if len(loss_list) > 0 else np.nan
         snapshot_manager.register(iteration=epoch,
                                   training_loss=training_loss,
-                                  validation_loss=best_iou,
+                                  validation_loss=highest_iou,
                                   model=model, optimizer=optimizer)
+
         # Log epoch metrics
-        tensorboard.add_scalar('validation/best_iou', best_iou, epoch)
         tensorboard.add_scalar('training/loss', training_loss, epoch)
         tensorboard.add_scalar('training/learning_rate', scheduler.get_lr(), epoch)
-
         test_miou = test_multi_runs(options, mode='last', num_runs=1)
         tensorboard.add_scalar('test/mean_iou', test_miou, epoch)
 
         scheduler.step()
 
     tensorboard.close()
+
+    if options.noval: # Save last checkpoint in case no validation
+        model = model.eval()
+        torch.save(model.cpu().state_dict(), osp.join(checkpoint_dir, 'model', 'best.pth'))
+        print('A model is saved')
+

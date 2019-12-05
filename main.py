@@ -162,12 +162,17 @@ parser.add_argument('-data_aug',
                     default=0,
                     help='option to augment data or not')
 
+parser.add_argument('-noval',
+                    type=int,
+                    default=1,
+                    help='Flag to not perform validation and save last ckpt')
+
 def main(argv=None):
     options = parser.parse_args()
     if options.split not in ['trainval', 'val', 'test']:
         print('Error in split')
 
-    options = Namespace(load_and_save_params(vars(options), options.exp_dir))
+#    options = Namespace(load_and_save_params(vars(options), options.exp_dir))
 
     # To ensure reproducability
     if options.reproducability:

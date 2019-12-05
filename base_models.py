@@ -312,6 +312,10 @@ class ResNet(nn.Module):
 
 
         #side branch,get latent embedding z
+        srgb_size = support_rgb.shape
+        support_rgb = support_rgb.view(-1, srgb_size[2], srgb_size[3], srgb_size[4])
+        support_mask = support_mask[:, 0]
+
         support_rgb = self.conv1(support_rgb)
         support_rgb = self.bn1(support_rgb)
         support_rgb = self.relu(support_rgb)
