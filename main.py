@@ -159,7 +159,7 @@ parser.add_argument('-ftune_backbone',
 
 parser.add_argument('-data_aug',
                     type=int,
-                    default=0,
+                    default=1,
                     help='option to augment data or not')
 
 parser.add_argument('-noval',
