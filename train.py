@@ -110,11 +110,21 @@ def meta_train(options):
     loss_list = [] # track training loss
     iou_list = [] # track validaiton iou
     highest_iou = 0
+    best_iou = 0
     if len(snapshot_manager.losses['training']) > 0:
         loss_list = list(snapshot_manager.losses['training'].values())
     if len(snapshot_manager.losses['validation']) > 0:
         iou_list = list(snapshot_manager.losses['validation'].values())
         highest_iou = np.max(iou_list)
+
+    model.cuda()
+    model = model.train()
+
+    # initialize vars for summaries and logging
+    tensorboard = SummaryWriter(log_dir = os.path.join(checkpoint_dir, 'tensorboard'))
+    tempory_loss = 0  # accumulated loss
+    best_epoch=0
+    snapshot_manager.enable_time_tracking()
 
     for epoch in range(last_epoch+1, num_epoch):
         print('Running epoch ', epoch, ' from ', num_epoch)
@@ -154,7 +164,7 @@ def meta_train(options):
             loss.backward()
             optimizer.step()
 
-            tqdm_gen.set_description('e:%d loss = %.4f-' % (epoch, loss.item()))
+            tqdm_gen.set_description('e:%d loss = %.4f-:%.4f' % (epoch, loss.item(),highest_iou))
 
             #save training loss
             tempory_loss += loss.item()
@@ -250,6 +260,7 @@ def meta_train(options):
 
         # Measure time for one epoch
         epoch_time = time.time() - begin_time
+        print('best epoch:%d ,iout:%.4f' % (best_epoch, highest_iou))
         print('This epoch takes:', epoch_time, 'second')
         print('still need hour:%.4f' % ((num_epoch - epoch) * epoch_time / 3600))
 
@@ -257,10 +268,11 @@ def meta_train(options):
         training_loss = float(loss_list[-1]) if len(loss_list) > 0 else np.nan
         snapshot_manager.register(iteration=epoch,
                                   training_loss=training_loss,
-                                  validation_loss=highest_iou,
+                                  validation_loss=best_iou,
                                   model=model, optimizer=optimizer)
 
         # Log epoch metrics
+        tensorboard.add_scalar('validation/best_iou', best_iou, epoch)
         tensorboard.add_scalar('training/loss', training_loss, epoch)
         tensorboard.add_scalar('training/learning_rate', scheduler.get_lr(), epoch)
         test_miou = test_multi_runs(options, mode='last', num_runs=1)
