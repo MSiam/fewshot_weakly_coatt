@@ -15,7 +15,7 @@ from models import Res_Deeplab
 import torch.nn as nn
 import numpy as np
 import sys
-from torch.optim.lr_scheduler import StepLR
+from torch.optim.lr_scheduler import MultiStepLR
 from common.torch_utils import SnapshotManager
 from tensorboardX import SummaryWriter
 from coco import create_coco_fewshot
@@ -39,6 +39,7 @@ def meta_train(options):
     batch_size = options.bs
     weight_decay = 0.0005
     momentum = 0.9
+    milestones = [20, 30, 40]
 
     # Set Vars used for evalution mIoU
     if options.dataset_name == 'pascal':
@@ -90,11 +91,10 @@ def meta_train(options):
     last_epoch = snapshot_manager.restore(model, optimizer)
     print(f'Loaded epoch {last_epoch}')
     if last_epoch == 0:
-        scheduler = StepLR(optimizer, step_size=step_steplr, gamma=options.gamma_steplr)
-        scheduler = StepLR(optimizer, step_size=step_steplr, gamma=options.gamma_steplr, last_epoch=0)
+        scheduler = MultiStepLR(optimizer, milestones=milestones, gamma=options.gamma_steplr, last_epoch=0)
         last_epoch = -1
     else:
-        scheduler = StepLR(optimizer, step_size=step_steplr, gamma=options.gamma_steplr, last_epoch=last_epoch+1)
+        scheduler = MultiStepLR(optimizer, milestones=milestones, gamma=options.gamma_steplr, last_epoch=last_epoch+1)
 
     # Compute mapping used for setting validation mIoU
     mapping = {}
