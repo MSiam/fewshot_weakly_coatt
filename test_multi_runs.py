@@ -2,16 +2,16 @@
 import argparse
 import torch.backends.cudnn as cudnn
 import torch
-from models import Res_Deeplab
+from models.get_models import Res_Deeplab
 import torch.nn as nn
-from dataset_mask_val import Dataset, WebSetupDataset
+from dataloaders.dataset_mask_val import Dataset, WebSetupDataset
 from torch.utils import data
 import torch.nn.functional as F
 from utils import *
 import numpy as np
 import os
 import cv2
-from coco import create_coco_fewshot
+from dataloaders.coco import create_coco_fewshot
 from common.torch_utils import SnapshotManager
 import random
 

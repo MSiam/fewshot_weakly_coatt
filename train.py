@@ -6,19 +6,18 @@ import time
 import torch.nn.functional as F
 import tqdm
 import random
-from dataset_mask_train import Dataset as Dataset_train
-from dataset_mask_val import Dataset as Dataset_val
-from coco import create_coco_fewshot
+from dataloaders.dataset_mask_train import Dataset as Dataset_train
+from dataloaders.dataset_mask_val import Dataset as Dataset_val
+from dataloaders.coco import create_coco_fewshot
 import os
 import torch
-from models import Res_Deeplab
+from models.get_models import Res_Deeplab
 import torch.nn as nn
 import numpy as np
 import sys
 from torch.optim.lr_scheduler import MultiStepLR
 from common.torch_utils import SnapshotManager
 from tensorboardX import SummaryWriter
-from coco import create_coco_fewshot
 from test_multi_runs import test_multi_runs
 
 def meta_train(options):

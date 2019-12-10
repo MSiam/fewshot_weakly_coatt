@@ -1,6 +1,6 @@
-from coatt_models import CoResNet, WordEmbedResNet, WordEmbedCoResNet, WordEmbedProtoResNet
-from improved_models import IterativeWordEmbedCoResNet
-from base_models import ResNet, FilMGen, Bottleneck
+from models.coatt_models import CoResNet, WordEmbedResNet, WordEmbedCoResNet, WordEmbedProtoResNet
+from models.improved_models import IterativeWordEmbedCoResNet
+from models.base_models import ResNet, FilMGen, Bottleneck
 
 
 def Res_Deeplab(data_dir='./datasets/', num_classes=2, model_type='nwe_coatt',

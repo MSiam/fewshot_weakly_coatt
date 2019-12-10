@@ -2,7 +2,7 @@ import torch.nn as nn
 import torch
 import numpy as np
 import torch.nn.functional as F
-from coatt_models import WordEmbedCoResNet
+from models.coatt_models import WordEmbedCoResNet
 
 #code of dilated convolution part is referenced from https://github.com/speedinghzl/Pytorch-Deeplab
 

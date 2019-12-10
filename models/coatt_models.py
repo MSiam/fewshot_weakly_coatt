@@ -2,7 +2,7 @@ import torch.nn as nn
 import torch
 import numpy as np
 import torch.nn.functional as F
-from base_models import ResNet, FilMedBottleneck, FiLM
+from models.base_models import ResNet, FilMedBottleneck, FiLM
 import os
 
 

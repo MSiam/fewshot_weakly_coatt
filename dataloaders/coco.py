@@ -7,7 +7,7 @@ import numpy as np
 from PIL import Image
 import torch
 
-from common_coco import BaseDataset, PairedDataset
+from dataloaders.common_coco import BaseDataset, PairedDataset
 from torchvision.transforms import Compose
 import torchvision.transforms.functional as tr_F
 import random
