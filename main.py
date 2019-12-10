@@ -3,7 +3,6 @@
 """Training and evaluation entry point."""
 import argparse
 from train import meta_train
-from test_oslsm_setup import test
 from test_multi_runs import test_multi_runs
 from common.gen_experiments import load_and_save_params, Namespace
 import torch
@@ -172,7 +171,7 @@ def main(argv=None):
     if options.split not in ['trainval', 'val', 'test']:
         print('Error in split')
 
-    options = Namespace(load_and_save_params(vars(options), options.exp_dir))
+#    options = Namespace(load_and_save_params(vars(options), options.exp_dir))
 
     # To ensure reproducability
     if options.reproducability:
