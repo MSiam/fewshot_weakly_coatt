@@ -7,10 +7,13 @@ from models.coatt_models import WordEmbedCoResNet
 #code of dilated convolution part is referenced from https://github.com/speedinghzl/Pytorch-Deeplab
 
 class IterativeWordEmbedCoResNet(WordEmbedCoResNet):
-    def __init__(self, block, layers, num_classes, data_dir='./datasets/', embed='word2vec', dataset_name='pascal'):
+    def __init__(self, block, layers, num_classes, data_dir='./datasets/', embed='word2vec',
+                 dataset_name='pascal', align_loss=True):
+
         super(IterativeWordEmbedCoResNet, self).__init__(block, layers, num_classes,
                                                          data_dir=data_dir, embed=embed,
-                                                         dataset_name=dataset_name)
+                                                         dataset_name=dataset_name,
+                                                         align_loss=align_loss)
         self.reduction_cat = nn.Conv2d(512, 256, 1, bias=False)
 
     def coattend(self, va, vb, sprt_l, srgb_size):
@@ -105,24 +108,14 @@ class IterativeWordEmbedCoResNet(WordEmbedCoResNet):
         query_rgb_rep = query_rgb_rep.view(-1, sqry_size[2], sqry_size[3], sqry_size[4])
 
         va1, vb1 = self.coattend(query_rgb_rep, support_rgb, support_lbl, srgb_size)
-
         va1 = self.relu(self.reduction_cat(torch.cat([query_rgb_rep, va1], dim=1)))
         vb1 = self.relu(self.reduction_cat(torch.cat([support_rgb, vb1], dim=1)))
-
-        va2, _ = self.coattend(va1, vb1, support_lbl, srgb_size)
+        va2, vb2 = self.coattend(va1, vb1, support_lbl, srgb_size)
         z = va1 + va2
         z = z.view(srgb_size[0], srgb_size[1], z.shape[1], z.shape[2], z.shape[3])
         z = torch.mean(z, dim=1)
 
-#        va2, vb2 = self.coattend(va1, vb1, support_lbl)
-#        va2 = self.relu(self.reduction_cat(torch.cat([query_rgb, va2], dim=1)))
-#        vb2 = self.relu(self.reduction_cat(torch.cat([support_rgb, vb2], dim=1)))
-
-#        va2 = va1 + va2
-#        vb2 = vb1 + vb2
-#        va3, _ = self.coattend(va2, vb2, support_lbl)
-#        z = va2 + va3
-
+        # S2Q
         history_mask=F.interpolate(history_mask,feature_size,mode='bilinear',align_corners=True)
         out=torch.cat([query_rgb,z],dim=1)
         out = self.layer55(out)
@@ -136,6 +129,24 @@ class IterativeWordEmbedCoResNet(WordEmbedCoResNet):
         global_feature=global_feature.expand(-1,-1,feature_size[0],feature_size[1])
         out=torch.cat([global_feature,self.layer6_1(out),self.layer6_2(out),self.layer6_3(out),self.layer6_4(out)],dim=1)
         out=self.layer7(out)
-
         out=self.layer9(out)
-        return out
+
+        # Q2S
+        if not self.align_loss:
+            return out
+        else:
+            # Only perform laign loss when 1-shot
+            if srgb_size[1] != 1:
+                raise Exception('Trying to use align los with n_shot > 1')
+
+            z_sprt = vb1 + vb2
+            out_sprt = torch.cat([support_rgb, z_sprt], dim=1)
+            out_sprt = self.layer55(out_sprt)
+            global_feature = F.avg_pool2d(out_sprt, kernel_size=feature_size)
+            global_feature = self.layer6_0(global_feature)
+            global_feature = global_feature.expand(-1,-1,feature_size[0],feature_size[1])
+            out_sprt = torch.cat([global_feature, self.layer6_1(out_sprt), self.layer6_2(out_sprt),
+                                  self.layer6_3(out_sprt), self.layer6_4(out_sprt)], dim=1)
+            out_sprt = self.layer7(out_sprt)
+            out_sprt = self.layer9(out_sprt)
+            return out, out_sprt

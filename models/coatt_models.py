@@ -95,9 +95,10 @@ class CoResNet(ResNet):
 
 class WordEmbedCoResNet(CoResNet):
     def __init__(self, block, layers, num_classes, film_gen=None, data_dir='./datasets/',
-                 embed='word2vec', dataset_name='pascal'):
+                 embed='word2vec', dataset_name='pascal', align_loss=True):
         super(WordEmbedCoResNet, self).__init__(block, layers, num_classes)
         self.film_gen = film_gen
+        self.align_loss = align_loss
         if embed == 'word2vec':
             self.linear_word_embedding = nn.Linear(300, 256, bias=False)
         elif embed == 'fasttext':
@@ -286,7 +287,24 @@ class WordEmbedCoResNet(CoResNet):
         out=self.layer7(out)
 
         out=self.layer9(out)
-        return out
+
+        if not self.align_loss:
+            return out
+        else:
+            # Only perform laign loss when 1-shot
+            if srgb_size[1] != 1:
+                raise Exception('Trying to use align los with n_shot > 1')
+            z_sprt = self.coattend(support_rgb, query_rgb, nwe)
+            out_sprt = torch.cat([support_rgb, z_sprt], dim=1)
+            out_sprt = self.layer55(out_sprt)
+            global_feature = F.avg_pool2d(out_sprt, kernel_size=feature_size)
+            global_feature = self.layer6_0(global_feature)
+            global_feature = global_feature.expand(-1,-1,feature_size[0],feature_size[1])
+            out_sprt = torch.cat([global_feature, self.layer6_1(out_sprt), self.layer6_2(out_sprt),
+                                  self.layer6_3(out_sprt), self.layer6_4(out_sprt)], dim=1)
+            out_sprt = self.layer7(out_sprt)
+            out_sprt = self.layer9(out_sprt)
+            return out, out_sprt
 
 class WordEmbedResNet(CoResNet):
     def __init__(self, block, layers, num_classes, data_dir='./datasets/', embed='word2vec', dataset_name='pascal'):

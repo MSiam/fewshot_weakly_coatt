@@ -166,6 +166,11 @@ parser.add_argument('-noval',
                     default=1,
                     help='Flag to not perform validation and save last ckpt')
 
+parser.add_argument('-align_loss',
+                    type=int,
+                    default=1,
+                    help='Flag to enable loss on support set to align co-attention module on S2Q and Q2S')
+
 def main(argv=None):
     options = parser.parse_args()
     if options.split not in ['trainval', 'val', 'test']:

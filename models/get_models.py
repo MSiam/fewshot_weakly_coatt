@@ -5,7 +5,7 @@ from models.base_models import ResNet, FilMGen, Bottleneck
 
 def Res_Deeplab(data_dir='./datasets/', num_classes=2, model_type='nwe_coatt',
                 filmed=False, embed='word2vec', dataset_name='pascal',
-                backbone='resnet50'):
+                backbone='resnet50', align_loss=True):
 
     if filmed and 'nwe' in model_type:
         bottleneck_module = Bottleneck#FilMedBottleneck
@@ -22,11 +22,13 @@ def Res_Deeplab(data_dir='./datasets/', num_classes=2, model_type='nwe_coatt',
     if model_type == 'iter_nwe_coatt':
         model = IterativeWordEmbedCoResNet(bottleneck_module, block_list,
                                            num_classes, data_dir=data_dir,
-                                           embed=embed, dataset_name=dataset_name)
+                                           embed=embed, dataset_name=dataset_name,
+                                           align_loss=align_loss)
     elif model_type == 'nwe_coatt':
         model = WordEmbedCoResNet(bottleneck_module, block_list,
                                   num_classes, film_gen, data_dir=data_dir,
-                                  embed=embed, dataset_name=dataset_name)
+                                  embed=embed, dataset_name=dataset_name,
+                                  align_loss=align_loss)
     elif model_type == 'coatt':
         model = CoResNet(bottleneck_module, block_list,
                          num_classes)

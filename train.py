@@ -51,7 +51,7 @@ def meta_train(options):
     # Create network.
     model = Res_Deeplab(data_dir=data_dir, num_classes=num_class, model_type=options.model_type,
                         filmed=options.film, embed=options.embed_type, dataset_name=options.dataset_name,
-                        backbone=options.backbone)
+                        backbone=options.backbone, align_loss=options.align_loss)
 
     # load resnet-50 preatrained parameter
     model = load_resnet_param(model, model_name=options.backbone, stop_layer='layer4')
@@ -146,9 +146,12 @@ def meta_train(options):
             # Inference
             optimizer.zero_grad()
             if options.model_type == 'vanilla':
-                pred=model(query_rgb, support_rgb, support_mask,history_mask)
+                pred = model(query_rgb, support_rgb, support_mask,history_mask)
+            if options.model_type in ['nwe_coatt', 'iter_nwe_coatt'] and options.align_loss:
+                pred, pred_sprt = model(query_rgb, support_rgb, sample_class, history_mask)
             else:
-                pred=model(query_rgb, support_rgb, sample_class,history_mask)
+                pred = model(query_rgb, support_rgb, sample_class, history_mask)
+
             pred_softmax=F.softmax(pred,dim=1).data.cpu()
 
             #update history mask
@@ -161,6 +164,13 @@ def meta_train(options):
 
             # Compute loss and backpropagate
             loss = loss_calc_v1(pred, query_mask, 0)
+
+            # Compute Backward loss and add it to total loss
+            if options.model_type in ['nwe_coatt', 'iter_nwe_coatt'] and options.align_loss:
+                pred_sprt = nn.functional.interpolate(pred_sprt, size=input_size, mode='bilinear',
+                                                      align_corners=True)#upsample
+                loss += loss_calc_v1(pred_sprt, support_mask[:,0,0], 0)
+
             loss.backward()
             optimizer.step()
 
