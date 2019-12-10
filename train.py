@@ -147,7 +147,7 @@ def meta_train(options):
             optimizer.zero_grad()
             if options.model_type == 'vanilla':
                 pred = model(query_rgb, support_rgb, support_mask,history_mask)
-            if options.model_type in ['nwe_coatt', 'iter_nwe_coatt'] and options.align_loss:
+            elif options.model_type in ['nwe_coatt', 'iter_nwe_coatt'] and options.align_loss:
                 pred, pred_sprt = model(query_rgb, support_rgb, sample_class, history_mask)
             else:
                 pred = model(query_rgb, support_rgb, sample_class, history_mask)

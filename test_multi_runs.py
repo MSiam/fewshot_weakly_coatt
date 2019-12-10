@@ -108,6 +108,9 @@ def test_multi_runs(options, mode='best', num_runs=5):
                 if options.model_type == 'vanilla':
                     pred = model(query_rgb, support_rgb, support_mask,history_mask)
                     pred = model(query_rgb, support_rgb, support_mask, pred)
+                elif options.model_type in ['nwe_coatt', 'iter_nwe_coatt'] and options.align_loss:
+                    pred, _ = model(query_rgb, support_rgb, sample_class, history_mask)
+                    pred, _ = model(query_rgb, support_rgb, sample_class, pred)
                 else:
                     pred = model(query_rgb, support_rgb, sample_class,history_mask)
                     pred = model(query_rgb, support_rgb, sample_class, pred)
