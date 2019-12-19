@@ -18,11 +18,11 @@ RUN conda install python=3.6.7
 ENV LANG C.UTF-8
 
 RUN conda install -y pymongo pandas jupyter pillow requests matplotlib tqdm \
-    h5py pytorch=0.4.1 opencv
+    h5py pytorch=1.2.0 opencv
 
 RUN pip install pyyaml celery tensorflow-gpu==1.8.0 tensorboard==1.8.0 statsmodels gitpython \ 
-    scikit-image opencv-python scikit-learn googledrivedownloader scipy==0.19.0 torchvision==0.2.0 \
-    numpy==1.15.3 tensorboardX torch==0.4.1 
+    scikit-image opencv-python scikit-learn googledrivedownloader scipy==0.19.0 torchvision==0.4.0 \
+    numpy==1.17.3 tensorboardX torch==1.2.0  
     
 RUN pip install --upgrade cython
 
