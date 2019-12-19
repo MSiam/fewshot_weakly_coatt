@@ -38,7 +38,6 @@ parser.add_argument('-model_type',
                     help='type of model: vanilla, coatt, coatt_nwe',
                     default='vanilla')
 
-
 parser.add_argument('-fold',
                     type=int,
                     help='fold',
@@ -117,7 +116,6 @@ parser.add_argument('-reproducability',
                     type=int,
                     help='flag to ensure reproducability of the results but slower training',
                     default=0)
-
 
 parser.add_argument('-num_epoch',
                     type=int,
