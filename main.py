@@ -165,6 +165,12 @@ parser.add_argument('-noval',
                     default=1,
                     help='Flag to not perform validation and save last ckpt')
 
+parser.add_argument('-multires',
+                    type=int,
+                    default=1,
+                    help='Flag to perform pyramidal coattention')
+
+
 def main(argv=None):
     options = parser.parse_args()
     if options.split not in ['trainval', 'val', 'test']:

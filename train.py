@@ -55,7 +55,7 @@ def meta_train(options):
     # Create network.
     model = Res_Deeplab(data_dir=data_dir, num_classes=num_class, model_type=options.model_type,
                         filmed=options.film, embed=options.embed_type, dataset_name=options.dataset_name,
-                        backbone=options.backbone)
+                        backbone=options.backbone, multires_flag=options.multires)
 
     # load resnet-50 preatrained parameter
     model = load_resnet_param(model, model_name=options.backbone, stop_layer='layer4')

@@ -7,11 +7,37 @@ from coatt_models import WordEmbedCoResNet
 #code of dilated convolution part is referenced from https://github.com/speedinghzl/Pytorch-Deeplab
 
 class IterativeWordEmbedCoResNet(WordEmbedCoResNet):
-    def __init__(self, block, layers, num_classes, data_dir='./datasets/', embed='word2vec', dataset_name='pascal'):
+    def __init__(self, block, layers, num_classes, data_dir='./datasets/', embed='word2vec',
+                 dataset_name='pascal', multires_flag=True):
         super(IterativeWordEmbedCoResNet, self).__init__(block, layers, num_classes,
                                                          data_dir=data_dir, embed=embed,
                                                          dataset_name=dataset_name)
+        self.multires_flag = multires_flag
         self.reduction_cat = nn.Conv2d(512, 256, 1, bias=False)
+
+    def coattend_multires(self, va, vb, sprt_l, srgb_size):
+        # Resolution Level 1
+        uq, us = self.coattend(va, vb, sprt_l, srgb_size)
+
+        # Resolution Level 2
+        ksize = 2
+        va_ = nn.AvgPool2d(kernel_size=ksize)(va)
+        vb_ = nn.AvgPool2d(kernel_size=ksize)(vb)
+        uq_, us_ = self.coattend(va_, vb_, sprt_l, srgb_size)
+        uq_ = F.interpolate(uq_, uq.shape[2:], mode='bilinear', align_corners=True)
+        us_ = F.interpolate(us_, uq.shape[2:], mode='bilinear', align_corners=True)
+
+        # Resolution Level 3
+        ksize = 4
+        va_ = nn.AvgPool2d(kernel_size=ksize)(va)
+        vb_ = nn.AvgPool2d(kernel_size=ksize)(vb)
+        uq__, us__ = self.coattend(va, vb, sprt_l, srgb_size)
+        uq__ = F.interpolate(uq__, uq.shape[2:], mode='bilinear', align_corners=True)
+        us__ = F.interpolate(us__, uq.shape[2:], mode='bilinear', align_corners=True)
+
+        uq = torch.mean(torch.stack([uq, uq_, uq__]), axis=0)
+        us = torch.mean(torch.stack([us, us_, us__]), axis=0)
+        return uq, us
 
     def coattend(self, va, vb, sprt_l, srgb_size):
         """
@@ -104,12 +130,19 @@ class IterativeWordEmbedCoResNet(WordEmbedCoResNet):
         sqry_size = query_rgb_rep.shape
         query_rgb_rep = query_rgb_rep.view(-1, sqry_size[2], sqry_size[3], sqry_size[4])
 
-        va1, vb1 = self.coattend(query_rgb_rep, support_rgb, support_lbl, srgb_size)
+        if self.multires_flag:
+            va1, vb1 = self.coattend_multires(query_rgb_rep, support_rgb, support_lbl, srgb_size)
+        else:
+            va1, vb1 = self.coattend(query_rgb_rep, support_rgb, support_lbl, srgb_size)
 
         va1 = self.relu(self.reduction_cat(torch.cat([query_rgb_rep, va1], dim=1)))
         vb1 = self.relu(self.reduction_cat(torch.cat([support_rgb, vb1], dim=1)))
 
-        va2, _ = self.coattend(va1, vb1, support_lbl, srgb_size)
+        if self.multires_flag:
+            va2, _ = self.coattend_multires(va1, vb1, support_lbl, srgb_size)
+        else:
+            va2, _ = self.coattend(va1, vb1, support_lbl, srgb_size)
+
         z = va1 + va2
         z = z.view(srgb_size[0], srgb_size[1], z.shape[1], z.shape[2], z.shape[3])
         z = torch.mean(z, dim=1)
