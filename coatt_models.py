@@ -73,10 +73,18 @@ class CoResNet(ResNet):
 
 
         h,w=support_rgb.shape[-2:][0],support_rgb.shape[-2:][1]
-        z = self.coattend(query_rgb, support_rgb, support_lbl)
+
+        query_rgb_rep = query_rgb.unsqueeze(1).repeat(1, srgb_size[1], 1, 1, 1)
+        sqry_size = query_rgb_rep.shape
+        query_rgb_rep = query_rgb_rep.view(-1, sqry_size[2], sqry_size[3], sqry_size[4])
+
+        z = self.coattend(query_rgb_rep, support_rgb, -1)
 
         history_mask=F.interpolate(history_mask,feature_size,mode='bilinear',align_corners=True)
+        z = z.view(srgb_size[0], srgb_size[1], z.shape[1], z.shape[2], z.shape[3])
+        z = torch.mean(z, dim=1)
 
+        history_mask=F.interpolate(history_mask,feature_size,mode='bilinear',align_corners=True)
         out=torch.cat([query_rgb,z],dim=1)
         out = self.layer55(out)
         out_plus_history=torch.cat([out,history_mask],dim=1)
