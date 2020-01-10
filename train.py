@@ -15,7 +15,8 @@ from models import Res_Deeplab
 import torch.nn as nn
 import numpy as np
 import sys
-from torch.optim.lr_scheduler import MultiStepLR, CosineAnnealingLR
+from torch.optim.lr_scheduler import MultiStepLR
+from sgdr_optim import CosineAnnealingWithRestartsLR
 from common.torch_utils import SnapshotManager
 from tensorboardX import SummaryWriter
 from coco import create_coco_fewshot
@@ -102,11 +103,11 @@ def meta_train(options):
             scheduler = MultiStepLR(optimizer, milestones=milestones, gamma=options.gamma_steplr, last_epoch=last_epoch+1)
     else:
         if last_epoch == 0:
-            scheduler = CosineAnnealingLR(optimizer, T_max=options.warm_restarts)
-            scheduler = CosineAnnealingLR(optimizer, T_max=options.warm_restarts, last_epoch=0)
+            scheduler = CosineAnnealingWithRestartsLR(optimizer, T_max=options.warm_restarts)
+            scheduler = CosineAnnealingWithRestartsLR(optimizer, T_max=options.warm_restarts, last_epoch=0)
             last_epoch = -1
         else:
-            scheduler = CosineAnnealingLR(optimizer, T_max=options.warm_restarts, last_epoch=last_epoch+1)
+            scheduler = CosineAnnealingWithRestartsLR(optimizer, T_max=options.warm_restarts, last_epoch=last_epoch+1)
 
     # Compute mapping used for setting validation mIoU
     mapping = {}
