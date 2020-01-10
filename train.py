@@ -15,7 +15,7 @@ from models import Res_Deeplab
 import torch.nn as nn
 import numpy as np
 import sys
-from torch.optim.lr_scheduler import MultiStepLR
+from torch.optim.lr_scheduler import MultiStepLR, CosineAnnealingLR
 from common.torch_utils import SnapshotManager
 from tensorboardX import SummaryWriter
 from coco import create_coco_fewshot
@@ -93,12 +93,20 @@ def meta_train(options):
                                        logging_frequency=1, snapshot_frequency=1)
     last_epoch = snapshot_manager.restore(model, optimizer)
     print(f'Loaded epoch {last_epoch}')
-    if last_epoch == 0:
-        scheduler = MultiStepLR(optimizer, milestones=milestones, gamma=options.gamma_steplr)
-        scheduler = MultiStepLR(optimizer, milestones=milestones, gamma=options.gamma_steplr, last_epoch=0)
-        last_epoch = -1
+    if options.warm_restarts == -1:
+        if last_epoch == 0:
+            scheduler = MultiStepLR(optimizer, milestones=milestones, gamma=options.gamma_steplr)
+            scheduler = MultiStepLR(optimizer, milestones=milestones, gamma=options.gamma_steplr, last_epoch=0)
+            last_epoch = -1
+        else:
+            scheduler = MultiStepLR(optimizer, milestones=milestones, gamma=options.gamma_steplr, last_epoch=last_epoch+1)
     else:
-        scheduler = MultiStepLR(optimizer, milestones=milestones, gamma=options.gamma_steplr, last_epoch=last_epoch+1)
+        if last_epoch == 0:
+            scheduler = CosineAnnealingLR(optimizer, T_max=options.warm_restarts)
+            scheduler = CosineAnnealingLR(optimizer, T_max=options.warm_restarts, last_epoch=0)
+            last_epoch = -1
+        else:
+            scheduler = CosineAnnealingLR(optimizer, T_max=options.warm_restarts, last_epoch=last_epoch+1)
 
     # Compute mapping used for setting validation mIoU
     mapping = {}

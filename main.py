@@ -170,6 +170,10 @@ parser.add_argument('-multires',
                     default=1,
                     help='Flag to perform pyramidal coattention')
 
+parser.add_argument('-warm_restarts',
+                    type=int,
+                    default=-1,
+                    help='Epoch for next restart, -1 will disable warm restarts and use normal multistep LR for scheduling')
 
 def main(argv=None):
     options = parser.parse_args()
