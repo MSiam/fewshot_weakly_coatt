@@ -10,7 +10,7 @@ from common.gen_experiments import gen_experiments_dir, find_variables
 os.environ['LANG'] = 'en_CA.UTF-8'
 
 if __name__ == "__main__":
-    exp_description = "fasttext_trainval"
+    exp_description = "pascal_1n5shots"
     # This is the 5-way 5-sot configuration
     params = dict(
         fold=[0, 1, 2, 3],
@@ -19,17 +19,21 @@ if __name__ == "__main__":
         data_dir='/mnt/datasets/public/research/pascal/VOCdevkit/VOC2012/',
         film=0,
         use_web=0,
-        save_vis='VIS_DIR',
-        model_type=['iter_nwe_coatt', 'coatt', 'nwe', 'nwe_coatt'],
-        train=1,
-        seed=[1337],
-        num_epoch=200,
-        gamma_steplr=1.0,
-        bs=4,
-        lr=[0.001],
-        embed_type=['word2vec','concat'],
-        dataset_name=['pascal'],
+        save_vis='',
+        model_type=['iter_nwe_coatt', 'coatt', 'nwe', 'nwe_coatt'], # ['iter_nwe_coatt', 'coatt', 'nwe', 'nwe_coatt'],
+        seed=[1237, 8773, 9258, 5118, 19783], #98427
+        num_epoch=50,
+        milestone_length=[0.1],
+        gamma_steplr=0.1,
+        bs=[4],
+        lr=0.001,
+        embed_type=['word2vec'],
+        dataset_name=['pascal'], # ['pascal', 'coco']
         test_multi_run=1,
+        train=1,
+        reproducability=0,
+        n_shots=[1, 5],
+        multires=0,
     )
 
     parser = argparse.ArgumentParser()
