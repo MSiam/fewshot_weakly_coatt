@@ -8,7 +8,7 @@ from coatt_models import WordEmbedCoResNet
 
 class IterativeWordEmbedCoResNet(WordEmbedCoResNet):
     def __init__(self, block, layers, num_classes, data_dir='./datasets/', embed='word2vec',
-                 dataset_name='pascal', multires_flag=True):
+                 dataset_name='pascal', multires_flag=False):
         super(IterativeWordEmbedCoResNet, self).__init__(block, layers, num_classes,
                                                          data_dir=data_dir, embed=embed,
                                                          dataset_name=dataset_name)
@@ -123,7 +123,6 @@ class IterativeWordEmbedCoResNet(WordEmbedCoResNet):
         support_rgb = self.layer3(support_rgb)
         support_rgb = torch.cat([support_feat_layer2, support_rgb], dim=1)
         support_rgb = self.layer5(support_rgb)
-
 
         h,w=support_rgb.shape[-2:][0],support_rgb.shape[-2:][1]
         query_rgb_rep = query_rgb.unsqueeze(1).repeat(1, srgb_size[1], 1, 1, 1)

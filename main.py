@@ -167,7 +167,7 @@ parser.add_argument('-noval',
 
 parser.add_argument('-multires',
                     type=int,
-                    default=1,
+                    default=0,
                     help='Flag to perform pyramidal coattention')
 
 parser.add_argument('-warm_restarts',
