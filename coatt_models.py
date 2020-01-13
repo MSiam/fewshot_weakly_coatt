@@ -13,7 +13,7 @@ class CoResNet(ResNet):
         self.gate = nn.Conv2d(256, 1, kernel_size  = 1, bias = False)
         self.gate_s = nn.Sigmoid()
 
-    def coattend(self, va, vb, sprt_l):
+    def coattend(self, va, vb, sprt_l, srgb_size):
         """
         Performs coattention between support set and query set
         va: query features
@@ -78,7 +78,7 @@ class CoResNet(ResNet):
         sqry_size = query_rgb_rep.shape
         query_rgb_rep = query_rgb_rep.view(-1, sqry_size[2], sqry_size[3], sqry_size[4])
 
-        z = self.coattend(query_rgb_rep, support_rgb, support_lbl)
+        z = self.coattend(query_rgb_rep, support_rgb, support_lbl, srgb_size)
 
         history_mask=F.interpolate(history_mask,feature_size,mode='bilinear',align_corners=True)
         z = z.view(srgb_size[0], srgb_size[1], z.shape[1], z.shape[2], z.shape[3])
@@ -323,7 +323,7 @@ class WordEmbedResNet(CoResNet):
 
         self.reduction = nn.Conv2d(512, 256, 1, bias=False)
 
-    def coattend(self, va, vb, sprt_l):
+    def coattend(self, va, vb, sprt_l, srgb_size):
         """
         Performs coattention between support set and query set
         va: query features
@@ -341,6 +341,8 @@ class WordEmbedResNet(CoResNet):
         word_embedding = torch.stack(word_embedding).cuda().float()
         word_embedding = self.linear_word_embedding(word_embedding)
 
+        word_embed_rep = word_embedding.unsqueeze(1).repeat(1, srgb_size[1], 1)
+        word_embedding = word_embed_rep.view(-1, word_embedding.shape[1])
         word_embedding = word_embedding.unsqueeze(2).unsqueeze(2)
         word_embedding_tiled = word_embedding.repeat(1, 1, va.shape[2], va.shape[3])
         va = torch.cat((va, word_embedding_tiled), 1)
