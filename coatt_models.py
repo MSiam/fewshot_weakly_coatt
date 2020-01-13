@@ -78,7 +78,7 @@ class CoResNet(ResNet):
         sqry_size = query_rgb_rep.shape
         query_rgb_rep = query_rgb_rep.view(-1, sqry_size[2], sqry_size[3], sqry_size[4])
 
-        z = self.coattend(query_rgb_rep, support_rgb, -1)
+        z = self.coattend(query_rgb_rep, support_rgb, support_lbl)
 
         history_mask=F.interpolate(history_mask,feature_size,mode='bilinear',align_corners=True)
         z = z.view(srgb_size[0], srgb_size[1], z.shape[1], z.shape[2], z.shape[3])
