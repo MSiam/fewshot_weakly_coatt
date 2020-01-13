@@ -40,10 +40,10 @@ def meta_train(options):
     batch_size = options.bs
     weight_decay = 0.0005
     momentum = 0.9
-    if options.dataset_name == 'pascal':
-        milestones = [20, 30, 40]
-    else:
-        milestones = [50, 100, 130]
+
+    milestones = [int((1.0-3.0*options.milestone_length)*num_epoch),
+                  int((1.0-2.0*options.milestone_length)*num_epoch), 
+                  int((1.0-1.0*options.milestone_length)*num_epoch)]
 
     # Set Vars used for evalution mIoU
     if options.dataset_name == 'pascal':

@@ -175,6 +175,11 @@ parser.add_argument('-warm_restarts',
                     default=-1,
                     help='Epoch for next restart, -1 will disable warm restarts and use normal multistep LR for scheduling')
 
+parser.add_argument('-milestone_length',
+                    type=float,
+                    help='The length of milestone used by LR scheduler',
+                    default=0.2)
+
 def main(argv=None):
     options = parser.parse_args()
     if options.split not in ['trainval', 'val', 'test']:
