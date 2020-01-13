@@ -140,20 +140,22 @@ class IterativeWordEmbedCoResNet(WordEmbedCoResNet):
         if self.multires_flag:
             va2, _ = self.coattend_multires(va1, vb1, support_lbl, srgb_size)
         else:
-            va2, _ = self.coattend(va1, vb1, support_lbl, srgb_size)
+            va2, vb2 = self.coattend(va1, vb1, support_lbl, srgb_size)
 
-        z = va1 + va2
+        va2 = va1 + va2
+        vb2 = vb1 + vb2
+
+        va2 = self.relu(self.reduction_cat(torch.cat([query_rgb_rep, va2], dim=1)))
+        vb2 = self.relu(self.reduction_cat(torch.cat([support_rgb, vb2], dim=1)))
+
+        if self.multires_flag:
+            va3, _ = self.coattend_multires(va2, vb2, support_lbl, srqb_size)
+        else:
+            va3, _ = self.coattend(va2, vb2, support_lbl, srgb_size)
+
+        z = va2 + va3
         z = z.view(srgb_size[0], srgb_size[1], z.shape[1], z.shape[2], z.shape[3])
         z = torch.mean(z, dim=1)
-
-#        va2, vb2 = self.coattend(va1, vb1, support_lbl)
-#        va2 = self.relu(self.reduction_cat(torch.cat([query_rgb, va2], dim=1)))
-#        vb2 = self.relu(self.reduction_cat(torch.cat([support_rgb, vb2], dim=1)))
-
-#        va2 = va1 + va2
-#        vb2 = vb1 + vb2
-#        va3, _ = self.coattend(va2, vb2, support_lbl)
-#        z = va2 + va3
 
         history_mask=F.interpolate(history_mask,feature_size,mode='bilinear',align_corners=True)
         out=torch.cat([query_rgb,z],dim=1)
