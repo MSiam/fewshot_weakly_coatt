@@ -42,7 +42,7 @@ def meta_train(options):
     momentum = 0.9
 
     milestones = [int((1.0-3.0*options.milestone_length)*num_epoch),
-                  int((1.0-2.0*options.milestone_length)*num_epoch), 
+                  int((1.0-2.0*options.milestone_length)*num_epoch),
                   int((1.0-1.0*options.milestone_length)*num_epoch)]
 
     # Set Vars used for evalution mIoU
@@ -77,7 +77,7 @@ def meta_train(options):
     else:
         dataset, cat_ids = create_coco_fewshot(data_dir, 'train', input_size=input_size,
                                       n_ways=1, n_shots=1, max_iters=30000, fold=options.fold,
-                                      prob=options.prob, seed=options.seed)
+                                      prob=options.prob, seed=options.seed, data_aug=options.data_aug)
 
     trainloader = data.DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=options.num_workers)
 
@@ -204,7 +204,8 @@ def meta_train(options):
                     else:
                         valset, _ = create_coco_fewshot(data_dir, 'trainval', input_size=input_size,
                                                      n_ways=1, n_shots=1, max_iters=1000, fold=options.fold,
-                                                     prob=options.prob, seed=initial_seed+eva_iter)
+                                                     prob=options.prob, seed=initial_seed+eva_iter,
+                                                     data_aug=options.data_aug)
 
                     valset.history_mask_list=[None] * 1000
                     valloader = data.DataLoader(valset, batch_size=options.bs_val, shuffle=False,

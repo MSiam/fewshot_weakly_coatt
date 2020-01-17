@@ -134,6 +134,40 @@ class RandomMirror(object):
         sample['label'] = label
         return sample
 
+class RandomCropResize(object):
+    """
+    Resize images/masks to given size
+    Args:
+        size: output size
+    """
+    def __init__(self, size, seed=1337):
+        self.size = size
+        self.rand_gen = random.Random(seed)
+
+    def __call__(self, sample):
+        img, label = sample['image'], sample['label']
+        scaled_size = int(self.rand_gen.uniform(1, 1.3)*self.size[0])
+        margin_h = self.rand_gen.randint(0, scaled_size - self.size[0])
+        margin_w = self.rand_gen.randint(0, scaled_size - self.size[0])
+
+        img = tr_F.resize(img, (scaled_size, scaled_size))
+        img = np.asarray(img)[margin_h:margin_h + self.size[0], margin_w:margin_w + self.size[0], :]
+        img = Image.fromarray(img)
+        if isinstance(label, dict):
+            for catId, x in label.items():
+                label[catId] = tr_F.resize(x, (scaled_size, scaled_size), interpolation=Image.NEAREST)
+                label[catId] = np.asarray(label[catId])[margin_h:margin_h + self.size[0], margin_w:margin_w + self.size[0]]
+                label[catId] = Image.fromarray(label[catId])
+        else:
+            label = tr_F.resize(label, (scaled_size, scaled_size),
+                                interpolation=Image.NEAREST)
+            label = np.asarray(label)[margin_h:margin_h + self.size[0],
+                                      margin_w:margin_w + self.size[0], :]
+
+        sample['image'] = img
+        sample['label'] = label
+        return sample
+
 class Resize(object):
     """
     Resize images/masks to given size
@@ -267,10 +301,15 @@ def fewShot(paired_sample, n_ways, n_shots, cnt_query, coco=False):
 
 def create_coco_fewshot(base_dir, split, input_size,
                         n_ways, n_shots, max_iters, fold,
-                        prob, seed=1337, n_queries=1):
+                        prob, seed=1337, n_queries=1,
+                        data_aug=False):
 
-    transforms = Compose([Resize(size=input_size),
-                          RandomMirror(seed=seed)])
+    if data_aug:
+        transforms = Compose([RandomCropResize(size=input_size, seed=seed),
+                              RandomMirror(seed=seed)])
+    else:
+        transforms = Compose([Resize(size=input_size),
+                              RandomMirror(seed=seed)])
 
     to_tensor = ToTensorNormalize()
 
@@ -326,17 +365,19 @@ def create_coco_fewshot(base_dir, split, input_size,
 if __name__ ==  "__main__":
     dataset, cat_ids = create_coco_fewshot('/home/msiam/Dataset/COCO/', 'trainval', input_size=(321, 321),
                                           n_ways=1, n_shots=1, max_iters=30000, fold=2,
-                                          prob=0.6, seed=1337)
-    dataloader = data.DataLoader(dataset, batch_size=64, shuffle=False, num_workers=0,
+                                          prob=0.6, seed=1337, data_aug=True)
+    batch_size = 4
+    dataloader = data.DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=0,
                                 drop_last=False)
 
 
     for iter, sample in enumerate(dataloader):
         print('Iteration ', iter)
         qry_img, qry_mask, sprt_img, sprt_mask, history, sprt_original, qry_original, cls, idx = sample
-       # plt.figure(1); plt.imshow(np.transpose(qry_original, (1,2,0)));
-       # plt.figure(2); plt.imshow(np.transpose(sprt_original, (1,2,0)));
-       # plt.figure(3); plt.imshow(qry_mask[0]);
-       # plt.figure(4); plt.imshow(sprt_mask[0]);plt.show()
-        print('Class # ', cls)
-       # import pdb; pdb.set_trace()
+        import pdb; pdb.set_trace()
+        for i in range(batch_size):
+            plt.figure(1); plt.imshow(np.transpose(qry_original[i], (1,2,0)));
+            plt.figure(2); plt.imshow(np.transpose(sprt_original[i,0], (1,2,0)));
+            plt.figure(3); plt.imshow(qry_mask[i,0]);
+            plt.figure(4); plt.imshow(sprt_mask[i,0,0]);plt.show()
+            print('Class # ', cls[i])

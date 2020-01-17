@@ -182,7 +182,7 @@ parser.add_argument('-milestone_length',
 
 def main(argv=None):
     options = parser.parse_args()
-    if options.split not in ['trainval', 'val', 'test']:
+    if options.split not in ['trainval', 'val', 'test', 'train']:
         print('Error in split')
 
     options = Namespace(load_and_save_params(vars(options), options.exp_dir))
@@ -204,7 +204,7 @@ def main(argv=None):
         meta_train(options)
 
     if options.test_multi_run:
-        test_multi_runs(options)
+        test_multi_runs(options, num_runs=int(options.iter_time))
     else:
         test(options)
 
