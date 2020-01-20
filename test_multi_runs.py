@@ -20,7 +20,7 @@ def save(save_dir, support_rgb, support_mask, query_rgb, pred, iter_i):
             enumerate(zip(support_rgb, support_mask, query_rgb, pred)):
         cv2.imwrite(save_dir+'/sprt/'+'%05d'%(iter_i+i)+'.png', srgb[0].numpy())
         cv2.imwrite(save_dir+'/qry/'+'%05d'%(iter_i+i)+'.png', qrgb.numpy())
-        cv2.imwrite(save_dir+'/sprt_lbl/'+'%05d'%(iter_i+i)+'.png', smask[0].cpu().numpy())
+        cv2.imwrite(save_dir+'/sprt_lbl/'+'%05d'%(iter_i+i)+'.png', smask[0, 0].cpu().numpy())
         cv2.imwrite(save_dir+'/qry_pred/'+'%05d'%(iter_i+i)+'.png', p.cpu().numpy())
 
 def test_multi_runs(options, mode='best', num_runs=5):
