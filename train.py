@@ -36,7 +36,12 @@ def meta_train(options):
     num_epoch = options.num_epoch
     step_steplr = num_epoch / 3.0
     learning_rate = options.lr  # 0.000025#0.00025
-    input_size = (321, 321)
+    
+    if options.dataset_name == 'pascal':
+        input_size = (321, 321)
+    elif options.dataset_name == 'coco':
+        input_size = (417, 417)
+        
     batch_size = options.bs
     weight_decay = 0.0005
     momentum = 0.9
