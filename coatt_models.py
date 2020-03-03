@@ -5,6 +5,72 @@ import torch.nn.functional as F
 from base_models import ResNet, FilMedBottleneck, FiLM
 import os
 
+class SimplerNet(ResNet):
+    def __init__(self, block, layers, num_classes):
+        super(SimplerNet, self).__init__(block, layers, num_classes)
+        self.projection = nn.Conv2d(512, 256, 1, bias=False)
+
+    def forward(self, query_rgb, support_rgb, support_lbl, history_mask):
+        # Assuming always 1shot is working in coatt model
+        srgb_size = support_rgb.shape
+        support_rgb = support_rgb.view(-1, srgb_size[2], srgb_size[3], srgb_size[4])
+
+        # important: do not optimize the RESNET backbone
+        query_rgb = self.conv1(query_rgb)
+        query_rgb = self.bn1(query_rgb)
+        query_rgb = self.relu(query_rgb)
+        query_rgb = self.maxpool(query_rgb)
+        query_rgb = self.layer1(query_rgb)
+        query_rgb = self.layer2(query_rgb)
+        query_feat_layer2=query_rgb
+        query_rgb = self.layer3(query_rgb)
+        query_rgb=torch.cat([query_feat_layer2,query_rgb],dim=1)
+        query_rgb = self.layer5(query_rgb)
+
+        feature_size = query_rgb.shape[-2:]
+
+        #side branch,get latent embedding z
+        support_rgb = self.conv1(support_rgb)
+        support_rgb = self.bn1(support_rgb)
+        support_rgb = self.relu(support_rgb)
+        support_rgb = self.maxpool(support_rgb)
+        support_rgb = self.layer1(support_rgb)
+        support_rgb = self.layer2(support_rgb)
+        support_feat_layer2 = support_rgb
+        support_rgb = self.layer3(support_rgb)
+        support_rgb = torch.cat([support_feat_layer2, support_rgb], dim=1)
+        support_rgb = self.layer5(support_rgb)
+
+
+        h,w = support_rgb.shape[-2:][0],support_rgb.shape[-2:][1]
+
+        query_rgb_rep = query_rgb.unsqueeze(1).repeat(1, srgb_size[1], 1, 1, 1)
+        sqry_size = query_rgb_rep.shape
+        query_rgb_rep = query_rgb_rep.view(-1, sqry_size[2], sqry_size[3], sqry_size[4])
+
+        z = torch.cat((query_rgb_rep, support_rgb), dim=1)
+        z = self.projection(z)
+
+        history_mask = F.interpolate(history_mask,feature_size,mode='bilinear',align_corners=True)
+        z = z.view(srgb_size[0], srgb_size[1], z.shape[1], z.shape[2], z.shape[3])
+        z = torch.mean(z, dim=1)
+
+        history_mask = F.interpolate(history_mask,feature_size,mode='bilinear',align_corners=True)
+        out=torch.cat([query_rgb,z],dim=1)
+        out = self.layer55(out)
+        out_plus_history=torch.cat([out,history_mask],dim=1)
+        out = out + self.residule1(out_plus_history)
+        out = out + self.residule2(out)
+        out = out + self.residule3(out)
+
+        global_feature=F.avg_pool2d(out,kernel_size=feature_size)
+        global_feature=self.layer6_0(global_feature)
+        global_feature=global_feature.expand(-1,-1,feature_size[0],feature_size[1])
+        out=torch.cat([global_feature,self.layer6_1(out),self.layer6_2(out),self.layer6_3(out),self.layer6_4(out)],dim=1)
+        out=self.layer7(out)
+
+        out=self.layer9(out)
+        return out
 
 class CoResNet(ResNet):
     def __init__(self, block, layers, num_classes):
