@@ -1,4 +1,4 @@
-from coatt_models import CoResNet, WordEmbedResNet, WordEmbedCoResNet, WordEmbedProtoResNet, SimplerNet
+from coatt_models import CoResNet, WordEmbedResNet, WordEmbedCoResNet, WordEmbedProtoResNet, SimplerNet, SimpleWordEmbedCoResNet
 from improved_models import IterativeWordEmbedCoResNet
 from base_models import ResNet, FilMGen, Bottleneck
 
@@ -33,6 +33,8 @@ def Res_Deeplab(data_dir='./datasets/', num_classes=2, model_type='nwe_coatt',
                          num_classes)
     elif model_type == 'simple':
         model = SimplerNet(bottleneck_module, block_list, num_classes)
+    elif model_type == 'simple_nwe_coatt':
+        model = SimpleWordEmbedCoResNet(bottleneck_module, block_list, num_classes)
     elif model_type == 'nwe':
         model = WordEmbedResNet(bottleneck_module, block_list,
                                 num_classes, data_dir=data_dir,
