@@ -11,7 +11,7 @@
 folds=(0 1 2 3)
 n_shots=1
 models=('iter_nwe_coatt')
-MODEL=simple_nwe_coatt
+MODEL='simple_nwe_coatt'
 experiments=(0 $MODEL 1 $MODEL 2 $MODEL 3 $MODEL)
 
 #for fold in {0..1}

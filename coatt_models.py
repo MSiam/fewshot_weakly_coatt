@@ -415,6 +415,42 @@ class SimpleWordEmbedCoResNet(CoResNet):
         za = self.reduction(va)
         return za
 
+class WordEmbedChannelAtt(SimpleWordEmbedCoResNet):
+    def __init__(self, block, layers, num_classes, data_dir='./datasets/', embed='word2vec', dataset_name='pascal'):
+        super(WordEmbedChannelAtt, self).__init__(block, layers, num_classes,
+                                                      data_dir=data_dir, embed=embed,
+                                                      dataset_name=dataset_name)
+        self.att_conv = nn.Conv2d(256, 256, 1, bias=False)
+
+    def coattend(self, va, vb, sprt_l, srgb_size):
+        """
+        Performs coattention between support set and query set
+        va: query features
+        vb: support features
+        sprt_l: support image-level label
+        """
+        channel = va.shape[1]*2
+        fea_size = va.shape[2:]
+
+        word_embedding = []
+        for cls in sprt_l:
+            cls = self.classes[cls-1]
+            word_embedding.append(torch.tensor(self.word2vec[cls]))
+
+        word_embedding = torch.stack(word_embedding).cuda().float()
+        word_embedding = self.linear_word_embedding(word_embedding)
+
+        word_embed_rep = word_embedding.unsqueeze(1).repeat(1, srgb_size[1], 1)
+        word_embedding = word_embed_rep.view(-1, word_embedding.shape[1])
+        word_embedding = word_embedding.unsqueeze(2).unsqueeze(2)
+        word_embedding_tiled = word_embedding.repeat(1, 1, va.shape[2], va.shape[3])
+        va = torch.cat((va, vb, word_embedding_tiled), 1)
+        za = self.reduction(va)
+
+        att = self.att_conv(za)
+        za = za * F.softmax(att, dim=1)
+        return za
+
 class WordEmbedResNet(CoResNet):
     def __init__(self, block, layers, num_classes, data_dir='./datasets/', embed='word2vec', dataset_name='pascal'):
         super(WordEmbedResNet, self).__init__(block, layers, num_classes)
