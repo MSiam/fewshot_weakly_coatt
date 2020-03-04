@@ -11,7 +11,8 @@
 folds=(0 1 2 3)
 n_shots=1
 models=('iter_nwe_coatt')
-experiments=(0 'iter_nwe_coatt' 1 'iter_nwe_coatt' 2 'iter_nwe_coatt' 3 'iter_nwe_coatt')
+MODEL=simple_nwe_coatt
+experiments=(0 $MODEL 1 $MODEL 2 $MODEL 3 $MODEL)
 
 #for fold in {0..1}
 #do
@@ -25,4 +26,4 @@ echo Hello running $SLURM_ARRAY_TASK_ID fold ${experiments[$((($SLURM_ARRAY_TASK
 
 source $PROJECT/menna/.weblyvenv/bin/activate
 
-python main.py -fold ${experiments[$((($SLURM_ARRAY_TASK_ID-1)*2))]} -train 1 -test_multi_run 1 -model_type ${experiments[$((($SLURM_ARRAY_TASK_ID-1)*2+1))]} -embed_type word2vec -data_dir $PROJECT/menna/VOCdevkit/VOC2012/ -dataset_name pascal -n_shots $n_shots -bs 4 -ckpt ${experiments[$((($SLURM_ARRAY_TASK_ID-1)*2+1))]} -reproducability 1 -num_epoch 50 -lr 0.001 -gamma_steplr 0.1
+python main.py -fold ${experiments[$((($SLURM_ARRAY_TASK_ID-1)*2))]} -train 1 -test_multi_run 1 -model_type ${experiments[$((($SLURM_ARRAY_TASK_ID-1)*2+1))]} -embed_type word2vec -data_dir /home/menna/projects/def-jag/menna/VOCdevkit/VOC2012/ -dataset_name pascal -n_shots $n_shots -bs 4 -ckpt ${experiments[$((($SLURM_ARRAY_TASK_ID-1)*2+1))]} -reproducability 0 -num_epoch 50 -lr 0.001 -gamma_steplr 0.1 -milestone_length 0.1
