@@ -420,7 +420,7 @@ class WordEmbedChannelAtt(SimpleWordEmbedCoResNet):
         super(WordEmbedChannelAtt, self).__init__(block, layers, num_classes,
                                                       data_dir=data_dir, embed=embed,
                                                       dataset_name=dataset_name)
-        self.att_conv = nn.Conv2d(256, 256, 1, bias=False)
+        self.ch_att_layer = nn.Linear(256*2, 256*3, bias=True)
 
     def coattend(self, va, vb, sprt_l, srgb_size):
         """
@@ -444,11 +444,14 @@ class WordEmbedChannelAtt(SimpleWordEmbedCoResNet):
         word_embedding = word_embed_rep.view(-1, word_embedding.shape[1])
         word_embedding = word_embedding.unsqueeze(2).unsqueeze(2)
         word_embedding_tiled = word_embedding.repeat(1, 1, va.shape[2], va.shape[3])
-        va = torch.cat((va, vb, word_embedding_tiled), 1)
-        za = self.reduction(va)
 
-        att = self.att_conv(za)
-        za = za * F.softmax(att, dim=1)
+        cond_signal = torch.cat((F.avg_pool2d(vb, fea_size).squeeze(),
+                                 word_embedding.squeeze()), dim=1)
+        att_weights = F.softmax(self.ch_att_layer(cond_signal), dim=1)
+
+        va = torch.cat((va, vb, word_embedding_tiled), 1)
+        va = va * att_weights.unsqueeze(2).unsqueeze(3)
+        za = self.reduction(va)
         return za
 
 class WordEmbedResNet(CoResNet):
