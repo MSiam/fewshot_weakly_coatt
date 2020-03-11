@@ -446,8 +446,7 @@ class WordEmbedChannelAtt(SimpleWordEmbedCoResNet):
         word_embedding_tiled = word_embedding.repeat(1, 1, va.shape[2], va.shape[3])
         cond_signal = torch.cat((F.avg_pool2d(vb, fea_size)[:,:,0,0],
                                  word_embedding[:,:,0,0]), dim=1)
-        att_weights = F.softmax(self.ch_att_layer(cond_signal), dim=1)
-
+        att_weights = F.sigmoid(self.ch_att_layer(cond_signal))
         va = torch.cat((va, vb, word_embedding_tiled), 1)
         va = va * att_weights.unsqueeze(2).unsqueeze(3)
         za = self.reduction(va)
