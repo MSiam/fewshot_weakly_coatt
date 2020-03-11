@@ -171,3 +171,74 @@ class IterativeWordEmbedCoResNet(WordEmbedCoResNet):
 
         out=self.layer9(out)
         return out
+
+class CSIterativeWordEmbed(IterativeWordEmbedCoResNet):
+    def __init__(self, block, layers, num_classes, data_dir='./datasets/', embed='word2vec',
+                 dataset_name='pascal', multires_flag=False):
+        super(CSIterativeWordEmbed, self).__init__(block, layers, num_classes, data_dir, embed,
+                                                   dataset_name, multires_flag)
+        self.mix_coeff = nn.Parameter(torch.tensor(0.5))
+        self.linear_e = nn.Linear(256, 256, bias = False)
+        self.reduction = nn.Conv2d(256, 256, 1, bias=False)
+        self.gate = nn.Conv2d(256, 1, kernel_size  = 1, bias = False)
+
+    def adaptive_mixture(self, visual, nwe):
+        mixed = F.sigmoid(self.mix_coeff) * nwe + (1 - F.sigmoid(self.mix_coeff)) * visual
+        return mixed
+
+    def coattend(self, va, vb, sprt_l, srgb_size):
+        """
+        Performs coattention between support set and query set
+        va: query features
+        vb: support features
+        sprt_l: support image-level label
+        """
+        channel = va.shape[1]
+        fea_size = va.shape[2:]
+
+        word_embedding = []
+        for cls in sprt_l:
+            cls = self.classes[cls-1]
+            word_embedding.append(torch.tensor(self.word2vec[cls]))
+
+        word_embedding = torch.stack(word_embedding).cuda().float()
+        word_embedding_rep = word_embedding.unsqueeze(1).repeat(1, srgb_size[1], 1)
+        word_embedding_rep = word_embedding_rep.view(-1, word_embedding.shape[1])
+
+        word_embedding_rep = self.linear_word_embedding(word_embedding_rep)
+
+        word_embedding_rep = word_embedding_rep.unsqueeze(2).unsqueeze(2)
+        word_embedding_tiled = word_embedding_rep.repeat(1, 1, va.shape[2], va.shape[3])
+        va = self.adaptive_mixture(va, word_embedding_tiled)
+        vb = self.adaptive_mixture(vb, word_embedding_tiled)
+
+        exemplar_flat = vb.view(vb.shape[0], vb.shape[1], -1) #N,C,H*W
+        query_flat = va.view(va.shape[0], va.shape[1], -1)
+
+        exemplar_t = torch.transpose(exemplar_flat,1,2).contiguous()
+        exemplar_corr = self.linear_e(exemplar_t)
+        S = torch.bmm(exemplar_corr, query_flat)
+        Sc = F.softmax(S, dim = 1) #
+        Sr = F.softmax(torch.transpose(S, 1, 2), dim = 1) #
+
+        uq = torch.bmm(exemplar_flat, Sc).contiguous()
+        uq = uq.view(-1, channel, fea_size[0], fea_size[1])
+
+        us = torch.bmm(query_flat, Sr).contiguous()
+        us = us.view(-1, channel, fea_size[0], fea_size[1])
+
+        input2_mask = self.gate(uq)
+        input2_mask = self.gate_s(input2_mask)
+
+        input1_mask = self.gate(us)
+        input1_mask = self.gate_s(input1_mask)
+
+        uq = uq * input2_mask
+        us = us * input1_mask
+
+        uq = self.reduction(uq)
+        us = self.reduction(us)
+
+        return uq, us
+
+

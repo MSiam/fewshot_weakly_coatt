@@ -185,7 +185,7 @@ def main(argv=None):
     if options.split not in ['trainval', 'val', 'test', 'train']:
         print('Error in split')
 
-    options = Namespace(load_and_save_params(vars(options), options.exp_dir))
+#    options = Namespace(load_and_save_params(vars(options), options.exp_dir))
 
     # To ensure reproducability
     if options.reproducability:
