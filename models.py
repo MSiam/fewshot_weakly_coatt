@@ -1,7 +1,8 @@
 from coatt_models import CoResNet, WordEmbedResNet, WordEmbedCoResNet, \
         WordEmbedProtoResNet, SimplerNet, SimpleWordEmbedCoResNet, \
         WordEmbedChannelAtt
-from improved_models import IterativeWordEmbedCoResNet, CSIterativeWordEmbed
+from improved_models import IterativeWordEmbedCoResNet, CSIterativeWordEmbed, \
+                                CSIterativeWordEmbed2
 from base_models import ResNet, FilMGen, Bottleneck
 
 
@@ -28,6 +29,11 @@ def Res_Deeplab(data_dir='./datasets/', num_classes=2, model_type='nwe_coatt',
                                            multires_flag=multires_flag)
     elif model_type == 'cs_iter_nwe_coatt':
         model = CSIterativeWordEmbed(bottleneck_module, block_list,
+                                     num_classes, data_dir=data_dir,
+                                     embed=embed, dataset_name=dataset_name,
+                                     multires_flag=multires_flag)
+    elif model_type == 'cs2_iter_nwe_coatt':
+        model = CSIterativeWordEmbed2(bottleneck_module, block_list,
                                      num_classes, data_dir=data_dir,
                                      embed=embed, dataset_name=dataset_name,
                                      multires_flag=multires_flag)

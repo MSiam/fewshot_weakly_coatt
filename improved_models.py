@@ -307,3 +307,28 @@ class CSIterativeWordEmbed(IterativeWordEmbedCoResNet):
         out=self.layer9(out)
         return out
 
+class CSIterativeWordEmbed2(CSIterativeWordEmbed):
+    def __init__(self, block, layers, num_classes, data_dir='./datasets/', embed='word2vec',
+             dataset_name='pascal', multires_flag=False):
+        super(CSIterativeWordEmbed2, self).__init__(block, layers, num_classes, data_dir, embed,
+                                               dataset_name, multires_flag)
+        self.gating = nn.Conv2d(512, 512, 1, bias=False)
+        self.reduction_mix = nn.Conv2d(512, 256, 1, bias=False)
+
+    def adaptive_mixture(self, visual, sprt_l):
+        word_embedding = []
+        for cls in sprt_l:
+            cls = self.classes[cls-1]
+            word_embedding.append(torch.tensor(self.word2vec[cls]))
+        word_embedding = torch.stack(word_embedding).cuda().float()
+        word_embedding = self.linear_word_embedding(word_embedding)
+
+        word_embedding = word_embedding.unsqueeze(2).unsqueeze(2)
+        word_embedding_tiled = word_embedding.repeat(1, 1, visual.shape[2],
+                                                     visual.shape[3])
+        mixed = torch.cat((word_embedding_tiled, visual), dim=1)
+        gating_out = self.gating(mixed)
+        gating_out = F.sigmoid(F.avg_pool2d(gating_out, gating_out.shape[-2:]))
+        gated = gating_out * mixed
+        return self.reduction_mix(gated)
+
