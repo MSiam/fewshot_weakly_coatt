@@ -182,8 +182,20 @@ class CSIterativeWordEmbed(IterativeWordEmbedCoResNet):
         self.reduction = nn.Conv2d(256, 256, 1, bias=False)
         self.gate = nn.Conv2d(256, 1, kernel_size  = 1, bias = False)
 
-    def adaptive_mixture(self, visual, nwe):
-        mixed = F.sigmoid(self.mix_coeff) * nwe + (1 - F.sigmoid(self.mix_coeff)) * visual
+    def adaptive_mixture(self, visual, sprt_l):
+        word_embedding = []
+        for cls in sprt_l:
+            cls = self.classes[cls-1]
+            word_embedding.append(torch.tensor(self.word2vec[cls]))
+        word_embedding = torch.stack(word_embedding).cuda().float()
+        word_embedding = self.linear_word_embedding(word_embedding)
+
+        word_embedding = word_embedding.unsqueeze(2).unsqueeze(2)
+        word_embedding_tiled = word_embedding.repeat(1, 1, visual.shape[2],
+                                                     visual.shape[3])
+
+        mixed = F.sigmoid(self.mix_coeff) * word_embedding_tiled + \
+                    (1 - F.sigmoid(self.mix_coeff)) * visual
         return mixed
 
     def coattend(self, va, vb, sprt_l, srgb_size):
@@ -195,22 +207,6 @@ class CSIterativeWordEmbed(IterativeWordEmbedCoResNet):
         """
         channel = va.shape[1]
         fea_size = va.shape[2:]
-
-        word_embedding = []
-        for cls in sprt_l:
-            cls = self.classes[cls-1]
-            word_embedding.append(torch.tensor(self.word2vec[cls]))
-
-        word_embedding = torch.stack(word_embedding).cuda().float()
-        word_embedding_rep = word_embedding.unsqueeze(1).repeat(1, srgb_size[1], 1)
-        word_embedding_rep = word_embedding_rep.view(-1, word_embedding.shape[1])
-
-        word_embedding_rep = self.linear_word_embedding(word_embedding_rep)
-
-        word_embedding_rep = word_embedding_rep.unsqueeze(2).unsqueeze(2)
-        word_embedding_tiled = word_embedding_rep.repeat(1, 1, va.shape[2], va.shape[3])
-        va = self.adaptive_mixture(va, word_embedding_tiled)
-        vb = self.adaptive_mixture(vb, word_embedding_tiled)
 
         exemplar_flat = vb.view(vb.shape[0], vb.shape[1], -1) #N,C,H*W
         query_flat = va.view(va.shape[0], va.shape[1], -1)
@@ -241,4 +237,73 @@ class CSIterativeWordEmbed(IterativeWordEmbedCoResNet):
 
         return uq, us
 
+    def forward(self, query_rgb, support_rgb, support_lbl, history_mask):
+        srgb_size = support_rgb.shape
+        support_rgb = support_rgb.view(-1, srgb_size[2], srgb_size[3], srgb_size[4])
+
+        # important: do not optimize the RESNET backbone
+        query_rgb = self.conv1(query_rgb)
+        query_rgb = self.bn1(query_rgb)
+        query_rgb = self.relu(query_rgb)
+        query_rgb = self.maxpool(query_rgb)
+        query_rgb = self.layer1(query_rgb)
+        query_rgb = self.layer2(query_rgb)
+        query_feat_layer2=query_rgb
+        query_rgb = self.layer3(query_rgb)
+        query_rgb=torch.cat([query_feat_layer2,query_rgb],dim=1)
+        query_rgb = self.layer5(query_rgb)
+
+        feature_size = query_rgb.shape[-2:]
+
+        #side branch,get latent embedding z
+        support_rgb = self.conv1(support_rgb)
+        support_rgb = self.bn1(support_rgb)
+        support_rgb = self.relu(support_rgb)
+        support_rgb = self.maxpool(support_rgb)
+        support_rgb = self.layer1(support_rgb)
+        support_rgb = self.layer2(support_rgb)
+        support_feat_layer2 = support_rgb
+        support_rgb = self.layer3(support_rgb)
+        support_rgb = torch.cat([support_feat_layer2, support_rgb], dim=1)
+        support_rgb = self.layer5(support_rgb)
+
+        h,w=support_rgb.shape[-2:][0],support_rgb.shape[-2:][1]
+        query_rgb_rep = query_rgb.unsqueeze(1).repeat(1, srgb_size[1], 1, 1, 1)
+        sqry_size = query_rgb_rep.shape
+        query_rgb_rep = query_rgb_rep.view(-1, sqry_size[2], sqry_size[3], sqry_size[4])
+
+        if self.multires_flag:
+            va1, vb1 = self.coattend_multires(query_rgb_rep, support_rgb, support_lbl, srgb_size)
+        else:
+            va1, vb1 = self.coattend(query_rgb_rep, support_rgb, support_lbl, srgb_size)
+
+        va1 = self.relu(self.reduction_cat(torch.cat([query_rgb_rep, va1], dim=1)))
+        vb1 = self.relu(self.reduction_cat(torch.cat([support_rgb, vb1], dim=1)))
+
+        if self.multires_flag:
+            va2, _ = self.coattend_multires(va1, vb1, support_lbl, srgb_size)
+        else:
+            va2, _ = self.coattend(va1, vb1, support_lbl, srgb_size)
+
+        z = va1 + va2
+        z = z.view(srgb_size[0], srgb_size[1], z.shape[1], z.shape[2], z.shape[3])
+        z = torch.mean(z, dim=1)
+
+        z = self.adaptive_mixture(z, support_lbl)
+        history_mask=F.interpolate(history_mask,feature_size,mode='bilinear',align_corners=True)
+        out=torch.cat([query_rgb,z],dim=1)
+        out = self.layer55(out)
+        out_plus_history=torch.cat([out,history_mask],dim=1)
+        out = out + self.residule1(out_plus_history)
+        out = out + self.residule2(out)
+        out = out + self.residule3(out)
+
+        global_feature=F.avg_pool2d(out,kernel_size=feature_size)
+        global_feature=self.layer6_0(global_feature)
+        global_feature=global_feature.expand(-1,-1,feature_size[0],feature_size[1])
+        out=torch.cat([global_feature,self.layer6_1(out),self.layer6_2(out),self.layer6_3(out),self.layer6_4(out)],dim=1)
+        out=self.layer7(out)
+
+        out=self.layer9(out)
+        return out
 
